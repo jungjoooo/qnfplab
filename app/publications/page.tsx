@@ -7,6 +7,148 @@ export default function Publications() {
     <div className="max-w-7xl mx-auto text-left">
       <div className="space-y-12 text-sm leading-relaxed">
         
+            {/* ================== 2026 ================== */}
+            <div className="space-y-4">
+              <p className="text-3xl text-black/70">2026</p>
+
+              <p>
+                박은서 · 한화진 · 조영일 (2026). Assessing treatment effects based on the two-wave latent
+                change score model: an alternative to repeated measures ANOVA. Journal of Behavioral
+                Medicine.
+              </p>
+
+              <p>
+                이정주 · 조영일 (2026). Just a Minute: A Pupil-Based Machine Learning Approach to
+                Depression Screening. Applied Psychophysiology and Biofeedback.
+              </p>
+
+              <p>
+                이정주 · 박은서 · 한화진 · 조영일 (2026). Emotional valence through pupil: Machine
+                learning classification under controlled visual complexity and emotional arousal in young
+                adults. Physiological Reports, 14(5).
+              </p>
+
+              <p>
+                유재효 · 조영일 (2026). 다문화 청소년의 비행 경험에 대한 예측 변수 탐색 모형 비교:
+                선형, 포아송, 음이항, 영과잉 포아송, 영과잉 음이항 모형을 중심으로. 사회과학연구,
+                37(1), 197–219.
+              </p>
+
+              <p>
+                문형진 · 조영일 (2026). 다문화 청소년의 문화적응 스트레스가 사회적 위축에 미치는 영향:
+                사회적 고립(외로움)과 우울의 순차매개효과. 안전문화연구, 51, 229–246.
+              </p>
+            </div>
+
+            {/* ================== 2025 ================== */}
+            <div className="space-y-4">
+              <p className="text-3xl text-black/70">2025</p>
+
+              <p>
+                이이나 · 박주애 · 박상진 · 조영일 (2025). A Comparison of Traditional Delinquency and
+                Cyber-Delinquency: General Strain Theory and Community Protective Factors. Deviant
+                Behavior, 46(1), 68–81.
+              </p>
+
+              <p>
+                박은서 · 조영일 · 김효진 · 임여진 · 김동희 (2025). Formative versus reflective
+                measurement models in nursing research: a secondary data analysis of a cross-sectional study
+                in Korea. Journal of Korean Academy of Nursing, 55(1), 107–118.
+              </p>
+
+              <p>
+                박은서 · 조영일 (2025). Classifying Stalking Persons in South Korea into Sub-Groups Based on
+                Urgent Emergency Measure Checklist. SAGE Open, 15(3), 68–81.
+              </p>
+
+              <p>
+                조영일 · 권아름 · 김효진 · 박은서 · 서정환 · 김동희 (2025). Exploring the Relationship
+                between Parental Stress and Child Behavioral Problems in Precocious Puberty: The Role of
+                Parenting and Coping Strategies. Yonsei Medical Journal, 66(7), 421–428.
+              </p>
+
+              <p>
+                박은서 · 송원영 · 권지혜 · 조영일 (2025). An Analysis of the Effectiveness of a
+                Psychotherapy Program for Individuals Convicted of Sexual Crimes in South Korean Prisons: A
+                Two-Wave Latent Change Score Approach. Sexual Abuse, 37(6), 667–691.
+              </p>
+
+              <p>
+                김승현 · 박은서 · 이성기 · 조영일 (2025). The Incremental Effects of Fraud Crime on
+                Suicide Among the Elderly in South Korea&apos;s Aging Society. SAGE Open, 15(4), 1–10.
+              </p>
+
+              <p>
+                손은아 · 조영일 (2025). 비공식 낙인, 비행친구교제와 사이버 일탈의 관계에 관한 연구:
+                애착의 조절된 매개효과를 중심으로. 한국공안행정학회보, 34(1), 243–272.
+              </p>
+
+              <p>
+                이정주 · 조영일 (2025). 우울이 공격성에 미치는 영향: 열등감의 조절효과를 중심으로.
+                한국범죄심리연구, 21(2), 115–130.
+              </p>
+
+              <p>
+                한화진 · 조영일 (2025). 삶의 만족도를 활용한 노인장기요양보험제도의 효과 검증:
+                성향점수매칭(PSM)을 중심으로. 사회과학연구, 54(2), 93–119.
+              </p>
+
+              <p>
+                박은서 · 전준하 · 조영일 (2025). 섭식장애 위험군 선별을 위한 한국판 SCOFF 척도의
+                타당화 연구: 20대 여자 대학생을 중심으로. 한국심리학회지: 일반, 44(3), 199–219.
+              </p>
+
+              <p>
+                김성민 · 조영일 (2025). 다문화 청소년의 문화적응 스트레스가 공격 행동에 미치는 영향:
+                사회적 위축과 우울의 순차매개효과. 한국범죄심리연구, 21(4), 37–54.
+              </p>
+            </div>
+
+            {/* ================== 2024 ================== */}
+            <div className="space-y-4">
+              <p className="text-3xl text-black/70">2024</p>
+
+              <p>
+                박주애 · 이성기 · 조영일 (2024). 노인의 가구형태가 범죄피해경험에 미치는 영향:
+                사회시설 이용빈도에 의해 조절된 차별경험의 매개효과. 한국경찰학회보, 26(1), 1–32.
+              </p>
+
+              <p>
+                김윤희 · 조영일 (2024). 적극적 여가활동 참여가 청소년 비행에 미치는 영향: 우울의
+                매개효과를 중심으로. 치안정책연구, 38(1), 47–76.
+              </p>
+
+              <p>
+                서예슬 · 조영일 (2024). 차별경험이 노인우울에 미치는 영향: 노인여가복지시설
+                이용경험의 조절효과를 중심으로. 한국경찰학회보, 26(3), 83–108.
+              </p>
+
+              <p>
+                전준하 · 조영일 (2024). 노인의 정서적 지지와 주관적 정신건강의 관계에서 관계 만족도의
+                매개효과: 1인 가구과 다인 가구 간의 다집단분석. 사회과학연구, 50(2), 37–66.
+              </p>
+
+              <p>
+                송인하 · 조영일 (2024). 노인의 독거 여부가 우울에 미치는 영향: 유형별 차별경험의
+                매개효과. 지역과 세계, 48(3), 5–28.
+              </p>
+
+              <p>
+                김성민 · 조영일 (2024). 청소년의 사회적 위축이 공격성에 미치는 영향: 스마트폰 의존도의
+                종단적 매개효과. 한국민간경비학회보, 23(5), 169–198.
+              </p>
+
+              <p>
+                임다은 · 조영일 (2024). 부모의 방임이 다문화청소년의 학업중단에 미치는 영향:
+                교사관계와 학교적응의 이중매개효과. 한국범죄심리연구, 20(4), 217–234.
+              </p>
+
+              <p>
+                한화진 · 유재효 · 조영일 (2024). 사회적 고립이 우울에 미치는 영향: 연락 수단에 따른
+                빈도를 중심으로. 한국테러학회보, 17(4), 212–237.
+              </p>
+            </div>
+
             {/* ================== 2023 ================== */}
             <div className="space-y-4">
               <p className="text-3xl text-black/70">2023</p>
