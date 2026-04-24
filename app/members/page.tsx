@@ -161,7 +161,7 @@ export default function Members() {
           />
 
           <MemberRow
-            image="/members/member9.png"
+            image="/members/member9.jpg"
             name="이정주"
             email="jung-joo@naver.com"
             interests={["Pupillometry", "Emotion", "기계학습"]}
