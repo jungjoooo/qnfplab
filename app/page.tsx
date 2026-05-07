@@ -3,30 +3,37 @@
 import Link from "next/link";
 import { chakra } from "./layout";
 
+const navItems = [
+  { href: "/vision", label: "Vision", meta: "What guides the lab" },
+  { href: "/research", label: "Research", meta: "Current questions" },
+  { href: "/members", label: "Members", meta: "People in the lab" },
+  { href: "/pupillometry", label: "Pupillometry", meta: "Measurement work" },
+  { href: "/publications", label: "Publications", meta: "Papers and output" },
+  { href: "/alumni", label: "Alumni", meta: "Former members" },
+];
+
 export default function Home() {
   return (
-    <main className="max-w-6xl mx-auto min-h-screen px-6 sm:px-8 py-20 sm:py-24 flex flex-col justify-center gap-24 sm:gap-28">
+    <main className="mx-auto flex min-h-screen max-w-6xl flex-col justify-center px-6 py-16 sm:px-8 sm:py-24">
       {/* ===== Header: Tree + Logo + Green Path + Postbox ===== */}
       <div className="relative">
         {/* 로고 */}
         <h1
-          className={`${chakra.className} text-[4.75rem] sm:text-[6rem] lg:text-[7rem] font-[600] tracking-wide text-center leading-none`}
+          className={`${chakra.className} text-center text-[4.4rem] font-[600] leading-none tracking-wide sm:text-[5.8rem] lg:text-[6.6rem]`}
         >
           QnFP Lab
         </h1>
+        <p className="mx-auto mt-8 max-w-2xl text-center text-base italic leading-7 text-gray-500 sm:text-lg">
+          Quantitative and forensic psychology lab studying measurable signals
+          of cognition, behavior, and pupil response.
+        </p>
 
         {/* 길 + 오브젝트를 감싸는 래퍼 */}
-        <div className="relative mt-12 sm:mt-14">
+        <div className="relative mt-14 sm:mt-16">
           {/* 🌱 초록색 길 (기준선) */}
           <div
-            className="w-full h-3 rounded-full opacity-75"
-            style={{ backgroundColor: "#008000" }}
+            className="h-px w-full bg-gray-300"
           />
-
-          {/* 🌳 나무 – 길 중앙 기준 */}
-          <div className="absolute left-0 top-1/2 -translate-y-[100%]">
-            <span className="text-6xl sm:text-7xl">🌳</span>
-          </div>
 
           {/* 📮 우편함 – 길 중앙 기준 */}
           <Link
@@ -39,7 +46,7 @@ export default function Home() {
             >
               Contact us
             </span>
-            <span className="text-5xl sm:text-6xl group-hover:scale-110 transition">
+            <span className="text-5xl sm:text-6xl transition group-hover:scale-110">
               📮
             </span>
           </Link>
@@ -47,67 +54,24 @@ export default function Home() {
       </div>
 
       {/* ===== Icon Launcher ===== */}
-      <section>
-        <div className="w-full grid grid-cols-2 sm:grid-cols-3 gap-x-8 gap-y-20 sm:gap-y-24 text-center">
-          <Link href="/vision" className="flex flex-col items-center gap-5">
-            <span className="text-5xl hover:scale-110 transition">💭</span>
-            <span
-              className={`${chakra.className} font-[300] text-base`}
+      <section className="mt-24 sm:mt-28">
+        <div className="grid grid-cols-1 border-t border-gray-200 sm:grid-cols-2 lg:grid-cols-3">
+          {navItems.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="group flex min-h-36 flex-col items-center justify-center border-b border-gray-200 px-6 py-9 text-center transition hover:bg-gray-50"
             >
-              Vision
-            </span>
-          </Link>
-
-          <Link href="/members" className="flex flex-col items-center gap-5">
-            <span className="text-5xl hover:scale-110 transition">🙂</span>
-            <span
-              className={`${chakra.className} font-[300] text-base`}
-            >
-              Members
-            </span>
-          </Link>
-
-          <Link href="/research" className="flex flex-col items-center gap-5">
-            <span className="text-5xl hover:scale-110 transition">🔍</span>
-            <span
-              className={`${chakra.className} font-[300] text-base`}
-            >
-              Research
-            </span>
-          </Link>
-
-          <Link href="/alumni" className="flex flex-col items-center gap-5">
-            <span className="text-5xl hover:scale-110 transition">🎓</span>
-            <span
-              className={`${chakra.className} font-[300] text-base`}
-            >
-              Alumni
-            </span>
-          </Link>
-
-          <Link
-            href="/pupillometry"
-            className="flex flex-col items-center gap-5"
-          >
-            <span className="text-5xl hover:scale-110 transition">👀</span>
-            <span
-              className={`${chakra.className} font-[300] text-base`}
-            >
-              Pupillometry
-            </span>
-          </Link>
-
-          <Link
-            href="/publications"
-            className="flex flex-col items-center gap-5"
-          >
-            <span className="text-5xl hover:scale-110 transition">📚</span>
-            <span
-              className={`${chakra.className} font-[300] text-base`}
-            >
-              Publications
-            </span>
-          </Link>
+              <span
+                className={`${chakra.className} block text-2xl font-[500] transition group-hover:text-gray-500`}
+              >
+                {item.label}
+              </span>
+              <span className="mt-3 block text-sm leading-6 text-gray-400">
+                {item.meta}
+              </span>
+            </Link>
+          ))}
         </div>
       </section>
     </main>

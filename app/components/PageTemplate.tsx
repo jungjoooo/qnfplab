@@ -10,6 +10,12 @@ export default function PageTemplate({
 }) {
   return (
     <main className="min-h-screen max-w-4xl mx-auto px-8 py-24 flex flex-col">
+      <div
+        className={`${chakra.className} fixed left-8 top-8 z-10 text-3xl font-[600] tracking-wide text-black`}
+      >
+        QnFP Lab
+      </div>
+
       {/* ===== 중앙 콘텐츠 영역 ===== */}
       <div className="flex-1 flex flex-col justify-center">
         {/* 페이지 제목 */}
