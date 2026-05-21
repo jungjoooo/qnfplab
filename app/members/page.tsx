@@ -75,7 +75,7 @@ const members = [
     details: ["Pupillometry", "Emotion", "기계학습"],
   },
   {
-    image: "/members/member10.png",
+    image: "/members/member10new.jpeg",
     name: "한화진",
     role: "Master's student",
     email: "amanda6864@naver.com",
