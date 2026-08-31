@@ -8,7 +8,7 @@ button, input, select { font: inherit; }
 button { cursor: pointer; }
 button:focus-visible, input:focus-visible, select:focus-visible, canvas:focus-visible { outline: 4px solid #f7cf4e; outline-offset: 4px; }
 
-.game-shell { width: min(1080px, calc(100% - 24px)); height: 100dvh; margin: 0 auto; padding: 12px 0; display: flex; flex-direction: column; gap: 8px; }
+.game-shell { width: min(1680px, calc(100% - clamp(16px, 2vw, 40px))); height: 100dvh; margin: 0 auto; padding: 12px 0; display: flex; flex-direction: column; gap: 8px; }
 .game-header, .header-side, .hud, .research-title, .research-controls { display: flex; align-items: center; gap: 14px; }
 .game-header { flex: none; justify-content: space-between; padding: 0 7px; }
 h1, h2, p { margin: 0; }
@@ -22,13 +22,13 @@ h2 { font-size: 1.4rem; line-height: 1; }
 .pixel-button:hover { transform: translate(1px, 1px); box-shadow: 2px 2px 0 #172f49; }
 .pixel-button.quiet { padding: 7px 10px; background: #edf4ee; font-size: 1rem; }
 
-.game-frame { position: relative; flex: 1 1 auto; min-height: 0; width: min(100%, calc((100dvh - 105px) * 1.66)); margin: 0 auto; border: 5px solid #172f49; box-shadow: 6px 6px 0 rgba(23,47,73,.35); background: #172f49; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
+.game-frame { position: relative; flex: 1 1 auto; min-height: 0; width: min(100%, calc((100dvh - 192px) * 1.6667 + 10px)); margin: 0 auto; border: 5px solid #172f49; box-shadow: 6px 6px 0 rgba(23,47,73,.35); background: #172f49; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
 .hud { min-height: 52px; justify-content: space-between; padding: 7px 14px; border-bottom: 4px solid #172f49; background: #f6ead2; }
 .hud-block { display: flex; flex-direction: column; gap: 2px; }
 .hud-block.right { align-items: flex-end; }
 .hud-label { color: #6f604a; font-size: .76rem; font-weight: 700; }
 .hud strong { color: #183750; font-size: 1.15rem; line-height: 1; }
-canvas { display: block; width: 100%; height: 100%; min-height: 0; background: #55829a; image-rendering: pixelated; }
+canvas { display: block; width: 100%; height: 100%; min-height: 0; background: #55829a; image-rendering: crisp-edges; image-rendering: pixelated; }
 .game-message { min-height: 30px; padding: 5px 12px; background: #edf4ee; color: #27455c; font-size: .94rem; font-weight: 700; text-align: center; }
 .screen-actions { position: absolute; left: 50%; bottom: 42px; transform: translateX(-50%); display: flex; justify-content: center; gap: 10px; }
 .screen-actions:empty { display: none; }
