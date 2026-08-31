@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="보물찾기 픽셀 게임 시연" />
+    <title>보물찾기</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="game-shell">
+      <header class="game-header">
+        <div>
+          <p class="eyebrow">비밀 지도에 적힌 마지막 항해</p>
+          <h1>보물찾기</h1>
+        </div>
+        <div class="header-side">
+          <span id="session-chip" class="session-chip">참가자 입력 대기</span>
+          <button id="restart-button" class="pixel-button quiet" type="button">처음부터</button>
+        </div>
+      </header>
+
+      <section class="game-frame" aria-label="픽셀 보물찾기 게임">
+        <div class="hud">
+          <div class="hud-block"><span class="hud-label">현재 목표</span><strong id="quest-title">참가자 정보를 입력하세요</strong></div>
+          <div class="hud-block right"><span class="hud-label">진행</span><strong id="quest-progress">준비</strong></div>
+        </div>
+        <canvas id="game-canvas" width="960" height="576" tabindex="0" aria-label="화살표 또는 WASD로 이동하고 스페이스바로 대상과 상호작용하는 게임 화면"></canvas>
+        <div id="game-message" class="game-message">참가자 정보를 입력하면 항해가 시작됩니다.</div>
+        <div id="screen-actions" class="screen-actions"></div>
+        <div class="touch-controls" aria-label="터치 조작">
+          <button data-move="up" class="move-button up" type="button">▲</button><button data-move="left" class="move-button left" type="button">◀</button><button data-move="down" class="move-button down" type="button">▼</button><button data-move="right" class="move-button right" type="button">▶</button>
+          <button id="touch-action" class="action-button" type="button">SPACE<br /><small>상호작용</small></button>
+        </div>
+      </section>
+
+      <details class="research-panel" aria-label="연구자용 조건·기록 제어" hidden>
+        <summary><span class="eyebrow">RESEARCHER VIEW</span> 조건 설정 · 이벤트 기록 · 내보내기</summary>
+        <div class="research-title"><h2>연구자 설정</h2><button id="toggle-events" class="link-button" type="button">이벤트 보기</button></div>
+        <div class="research-controls">
+          <label for="condition-select">게임 조건</label>
+          <select id="condition-select"><option value="gem">보석 경험 조건</option><option value="coins">금화 비교 조건</option></select>
+          <label for="gem-select">목표 보석</label>
+          <select id="gem-select"><option value="ruby">붉은빛 루비</option><option value="sapphire">푸른빛 사파이어</option><option value="emerald" selected>초록빛 에메랄드</option><option value="topaz">황금빛 토파즈</option><option value="amethyst">보랏빛 자수정</option></select>
+          <button id="download-events" class="pixel-button quiet" type="button">게임 이벤트 CSV</button>
+          <button id="download-cit" class="pixel-button quiet" type="button">CIT 순서표 CSV</button>
+        </div>
+        <p class="research-note">참가자에게는 이 패널을 열지 않습니다. 보석 조건에서는 목표 보석을 경험하고, 금화 조건에서는 보석 정보를 노출하지 않은 채 동일한 이동·획득·적재 과정을 진행합니다.</p>
+        <p id="storage-status" class="storage-status">저장 위치: 이 브라우저의 임시 기록</p>
+        <div id="event-log" class="event-log is-hidden"></div>
+      </details>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
