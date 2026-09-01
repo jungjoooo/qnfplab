@@ -1,6 +1,6 @@
 const canvas = document.querySelector("#game-canvas");
 const ctx = canvas.getContext("2d");
-ctx.imageSmoothingEnabled = false;
+ctx.imageSmoothingEnabled = true;
 
 const ui = {
   questTitle: document.querySelector("#quest-title"), questProgress: document.querySelector("#quest-progress"),
@@ -24,6 +24,16 @@ const deckCrew = [
   { x: 272, y: 397 }, { x: 320, y: 409 }, { x: 368, y: 398 }, { x: 416, y: 409 }, { x: 464, y: 398 },
 ];
 const crewLines = ["역시 선장님!!", "보물이다!", "우리가 해냈어!", "조심히 실어!", "항해가 살아난다!"];
+const practiceQuestions = [
+  "당신은 동굴에서 은빛 진주를 가져갔습니까?",
+  "당신은 동굴에서 오래된 나침반을 가져갔습니까?",
+  "당신은 동굴에서 산호 장식을 가져갔습니까?",
+];
+const practiceAudioFiles = [
+  "/treasure-hunt/audio/practice-01-pearl.mp3",
+  "/treasure-hunt/audio/practice-02-compass.mp3",
+  "/treasure-hunt/audio/practice-03-coral.mp3",
+];
 let activeCrewBubble = null;
 let nextCrewBubbleAt = 0;
 let crewTurn = 0;
@@ -47,7 +57,7 @@ function objectForm(noun) {
 function newState() {
   return {
     id: makeId(), phase: "intake", condition: ui.condition.value, targetGem: ui.gem.value,
-    testMode: true, participant: {}, carrying: null, chest: null, storyPage: 0, events: [], citSchedule: [], notification: "시연할 집단을 선택하세요. 이 모드에서는 데이터를 저장하지 않습니다.",
+    testMode: true, participant: {}, carrying: null, chest: null, storyPage: 0, practiceIndex: 0, practiceAudioFinished: false, events: [], citSchedule: [], notification: "시연할 집단을 선택하세요. 이 모드에서는 데이터를 저장하지 않습니다.",
   };
 }
 
@@ -76,9 +86,11 @@ function updateHud() {
   const target = selectedGem();
   const labels = {
     intake: ["시연 집단 선택", "준비"], story: ["항해 이야기", `${state.storyPage + 1} / 3`], caveIntro: ["동굴 탐색", "2 / 4"], caveExitStory: ["보물 회수", "2 / 4"], deckIntro: ["선박 적재", "4 / 4"],
-    shoreToCave: ["동굴 입구로 이동", "1 / 4"], cave: [state.carrying ? "해안으로 돌아가기" : (state.condition === "gem" ? `${target.label} 획득` : "금화 상자 획득"), "2 / 4"],
+    shoreToCave: ["동굴 입구로 이동", "1 / 4"], cave: [state.carrying ? "해안으로 돌아가기" : (state.condition === "gem" ? `${target.label} 획득` : "황금 동전 획득"), "2 / 4"],
     shoreToShip: ["보물선으로 이동", "3 / 4"], deck: [state.carrying ? "화물함에 적재" : "적재 완료" , "4 / 4"],
-    handoff: ["생리검사 준비", "완료"],
+    handoff: ["답변 연습 안내", "준비"],
+    practice: ["답변 연습", `${state.practiceIndex + 1} / ${practiceQuestions.length}`],
+    practiceComplete: ["답변 연습 완료", "완료"],
   };
   const [title, progress] = labels[state.phase] || labels.intake;
   ui.questTitle.textContent = title;
@@ -193,7 +205,7 @@ function drawCaveScene() {
   text("보석 동굴", 480, 62, 22, "#f8edcf", "center");
   if (!state.carrying) {
     drawPedestal(478, 345);
-    if (state.condition === "gem") { drawGem(463, 270, selectedGem(), selectedGem().label); } else { drawCoins(465, 285); text("금화 상자", 480, 342, 11, "#f8edcf", "center"); }
+    if (state.condition === "gem") { drawGem(463, 270, selectedGem(), selectedGem().label); } else { drawCoins(465, 285); text("황금 동전 한 닢", 480, 342, 11, "#f8edcf", "center"); }
     drawArrow({ x: 480, y: 266 });
   } else drawPortal(118, 376, "해안가로");
   drawPlayer();
@@ -245,10 +257,46 @@ function drawStory() {
     ["폭풍을 건넌 지 여러 날, 보물선의 식량과 금화는 바닥을 보입니다.", "선원들은 선장의 마지막 항해에 조용히 기대를 걸고 있습니다."],
     state.condition === "gem"
       ? [`비밀 지도는 해안 동굴 깊은 곳의 ${objectForm(target.label)} 가리킵니다.`, "그 보석을 찾아 보물선의 화물함에 안전하게 실으세요."]
-      : ["비밀 지도는 해안 동굴 깊은 곳의 금화 상자를 가리킵니다.", "그 금화를 찾아 보물선의 보물함에 안전하게 실으세요."],
+      : ["비밀 지도는 해안 동굴 깊은 곳의 황금 동전 한 닢을 가리킵니다.", "그 동전을 찾아 보물선의 보물함에 안전하게 실으세요."],
     ["해안에 닿았습니다. 동굴과 보물선 사이를 오가며 임무를 완수하세요.", "이동: 화살표 / WASD · 포탈·물체 앞에서 SPACE"],
   ];
+  if (state.storyPage === 1) {
+    drawHighlightedStory(target);
+    return;
+  }
   drawDialogue("선장의 항해일지", pages[state.storyPage][0], pages[state.storyPage][1]);
+}
+function drawEmphasisLine(parts, y, size) {
+  const displaySize = Math.round(size * 1.15);
+  ctx.save();
+  const widths = parts.map((part) => {
+    ctx.font = (part.strong ? "800 " : "700 ") + displaySize + "px Apple SD Gothic Neo, Malgun Gothic, Arial, sans-serif";
+    return ctx.measureText(part.value).width;
+  });
+  let x = 480 - widths.reduce((total, width) => total + width, 0) / 2;
+  parts.forEach((part, index) => {
+    ctx.font = (part.strong ? "800 " : "700 ") + displaySize + "px Apple SD Gothic Neo, Malgun Gothic, Arial, sans-serif";
+    ctx.fillStyle = part.color;
+    ctx.fillText(part.value, x, y);
+    x += widths[index];
+  });
+  ctx.restore();
+}
+function drawHighlightedStory(target) {
+  drawDialogue("선장의 항해일지", "", state.condition === "gem" ? "그 보석을 찾아 보물선의 화물함에 안전하게 실으세요." : "그 동전을 찾아 보물선의 보물함에 안전하게 실으세요.");
+  if (state.condition === "gem") {
+    drawEmphasisLine([
+      { value: "비밀 지도는 해안 동굴 깊은 곳의 ", color: "#1d4661" },
+      { value: target.label, color: target.color, strong: true },
+      { value: objectForm(target.label).slice(target.label.length) + " 가리킵니다.", color: "#1d4661" },
+    ], 414, 14);
+  } else {
+    drawEmphasisLine([
+      { value: "비밀 지도는 해안 동굴 깊은 곳의 ", color: "#1d4661" },
+      { value: "황금 동전", color: "#d69616", strong: true },
+      { value: " 한 닢을 가리킵니다.", color: "#1d4661" },
+    ], 414, 14);
+  }
 }
 function drawDialogue(title, line1, line2) {
   ctx.fillStyle = "rgba(11,30,47,.76)"; ctx.fillRect(88, 335, 784, 150); ctx.fillStyle = "#f8edcf"; ctx.fillRect(108, 353, 744, 112);
@@ -256,11 +304,11 @@ function drawDialogue(title, line1, line2) {
 }
 function drawCaveNarrative(phase) {
   drawCaveScene();
-  if (phase === "caveIntro") drawDialogue("동굴 입구", "파도 소리는 멀어지고, 차가운 물방울 소리만 동굴 안에 울립니다.", state.condition === "gem" ? "희미한 빛이 제단 위의 보석을 비추고 있습니다." : "희미한 빛이 제단 위의 금화 상자를 비추고 있습니다.");
-  else drawDialogue("보물 회수", state.condition === "gem" ? "손안의 보석은 묵직하고 차갑습니다." : "금화 상자는 생각보다 묵직합니다.", "기다리고 있을 선원들에게 돌아가기 위해 해안가 포탈을 찾으세요.");
+  if (phase === "caveIntro") drawDialogue("동굴 입구", "파도 소리는 멀어지고, 차가운 물방울 소리만 동굴 안에 울립니다.", state.condition === "gem" ? "희미한 빛이 제단 위의 보석을 비추고 있습니다." : "희미한 빛이 제단 위의 황금 동전 하나를 비추고 있습니다.");
+  else drawDialogue("보물 회수", state.condition === "gem" ? "손안의 보석은 묵직하고 차갑습니다." : "손안의 황금 동전은 따뜻하게 빛납니다.", "기다리고 있을 선원들에게 돌아가기 위해 해안가 포탈을 찾으세요.");
 }
 function drawDeckNarrative() {
-  drawDeck(); drawDialogue("보물선 갑판", "선원들이 난간 너머로 당신을 발견하고, 배 위가 잠시 술렁입니다.", state.condition === "gem" ? "보석을 보물함에 넣어 항해의 성과를 지키세요." : "금화 상자를 보물함에 넣어 항해의 성과를 지키세요.");
+  drawDeck(); drawDialogue("보물선 갑판", "선원들이 난간 너머로 당신을 발견하고, 배 위가 잠시 술렁입니다.", state.condition === "gem" ? "보석을 보물함에 넣어 항해의 성과를 지키세요." : "황금 동전을 보물함에 넣어 항해의 성과를 지키세요.");
 }
 function drawWantedPoster(x, y) {
   pixelRect(x, y, 230, 260, "#ead9ae", "#513d2b");
@@ -289,9 +337,291 @@ function drawHandoff() {
   text("CIT 순서표: 후보 5종 × 5회 = 25 문항", 582, 340, 12, "#47677c", "center");
   text("연구자 패널에서 게임 이벤트와 CIT 순서표를 CSV로 내려받을 수 있습니다.", 582, 381, 11, "#557083", "center");
 }
+function roundedPath(x, y, w, h, radius) {
+  const r = Math.min(radius, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+function fillRounded(x, y, w, h, radius, fill, stroke) {
+  roundedPath(x, y, w, h, radius);
+  ctx.fillStyle = fill;
+  ctx.fill();
+  if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 2; ctx.stroke(); }
+}
+function circle(x, y, radius, fill, stroke) {
+  ctx.beginPath(); ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.fillStyle = fill; ctx.fill();
+  if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 2; ctx.stroke(); }
+}
+function text(value, x, y, size, color, align) {
+  ctx.save();
+  ctx.fillStyle = color || "#173b56";
+  ctx.font = "700 " + Math.round(size * 1.15) + "px Apple SD Gothic Neo, Malgun Gothic, Arial, sans-serif";
+  ctx.textAlign = align || "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillText(value, x, y);
+  ctx.restore();
+}
+function titleText(value, x, y, size, color, align) {
+  ctx.save();
+  ctx.fillStyle = color || "#173b56";
+  ctx.font = "700 " + size + "px Gaegu, Apple SD Gothic Neo, Malgun Gothic, Arial, sans-serif";
+  ctx.textAlign = align || "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillText(value, x, y);
+  ctx.restore();
+}
+function pixelRect(x, y, w, h, color, outline) {
+  fillRounded(x, y, w, h, 13, color, outline);
+}
+function drawArrow(target) {
+  const bounce = Math.sin(performance.now() / 180) * 4;
+  ctx.save(); ctx.translate(target.x, target.y - 25 + bounce);
+  ctx.beginPath(); ctx.moveTo(0, 11); ctx.lineTo(-10, -5); ctx.lineTo(10, -5); ctx.closePath();
+  ctx.fillStyle = "#ffe36e"; ctx.shadowColor = "rgba(255,205,75,.9)"; ctx.shadowBlur = 12; ctx.fill(); ctx.restore();
+}
+function drawPortal(x, y, label) {
+  const pulse = 1 + Math.sin(performance.now() / 220) * .045;
+  ctx.save(); ctx.translate(x, y); ctx.scale(pulse, pulse);
+  ctx.beginPath(); ctx.ellipse(0, 0, 31, 48, 0, 0, Math.PI * 2);
+  ctx.strokeStyle = "rgba(74, 245, 241, .32)"; ctx.lineWidth = 15; ctx.shadowColor = "#70f7ed"; ctx.shadowBlur = 20; ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(0, 0, 29, 46, 0, 0, Math.PI * 2);
+  ctx.strokeStyle = "#d9ffff"; ctx.lineWidth = 3; ctx.shadowColor = "#58e7ec"; ctx.shadowBlur = 12; ctx.stroke();
+  ctx.restore();
+  text(label, x, y + 67, 12, "#164c68", "center");
+}
+function drawPlayer() {
+  const x = player.x + 22; const y = player.y + 27;
+  ctx.save(); ctx.translate(x, y);
+  ctx.shadowColor = "rgba(10,44,59,.28)"; ctx.shadowBlur = 7; ctx.shadowOffsetY = 4;
+  circle(-9, 22, 7, "#3e322c"); circle(10, 22, 7, "#3e322c");
+  ctx.shadowColor = "transparent";
+  fillRounded(-16, -1, 32, 27, 11, "#294f78", "#163955");
+  ctx.fillStyle = "#f3cf65"; ctx.fillRect(-16, 7, 32, 5);
+  circle(0, -13, 15, "#efbd8b", "#70412e");
+  ctx.fillStyle = "#744633"; ctx.beginPath(); ctx.arc(0, -17, 15, Math.PI, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(-22, -25); ctx.quadraticCurveTo(0, -46, 22, -25); ctx.lineTo(18, -17); ctx.lineTo(-18, -17); ctx.closePath();
+  const hat = ctx.createLinearGradient(0, -42, 0, -17); hat.addColorStop(0, "#243d65"); hat.addColorStop(1, "#102943"); ctx.fillStyle = hat; ctx.fill(); ctx.strokeStyle = "#0f2943"; ctx.lineWidth = 2; ctx.stroke();
+  ctx.fillStyle = "#c4463e"; ctx.fillRect(-19, -19, 38, 4);
+  circle(player.facing === "right" ? 6 : -6, -11, 2, "#183247");
+  if (state.carrying === "gem") drawGem(18, -27, selectedGem(), "");
+  if (state.carrying === "coins") drawCoins(16, -17);
+  ctx.restore();
+}
+function drawCrew(member) {
+  const x = member.x + 12; const y = member.y + 21;
+  ctx.save(); ctx.translate(x, y);
+  circle(-6, 18, 5, "#3f3936"); circle(7, 18, 5, "#3f3936");
+  fillRounded(-12, -1, 25, 22, 8, "#f4f5eb", "#244662");
+  ctx.fillStyle = "#315578"; ctx.fillRect(-12, 4, 25, 3); ctx.fillRect(-12, 12, 25, 3);
+  circle(0, -10, 11, "#f2c497", "#784b36");
+  ctx.fillStyle = "#e8f5f8"; ctx.beginPath(); ctx.ellipse(0, -20, 13, 5, 0, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = "#294f70"; ctx.lineWidth = 2; ctx.stroke();
+  circle(4, -10, 1.6, "#17374f");
+  ctx.restore();
+}
+function drawSpeechBubble(member, line) {
+  const width = Math.max(120, line.length * 13 + 28);
+  const x = Math.max(12, Math.min(member.x - width / 2 + 12, 948 - width)); const y = Math.max(78, member.y - 54);
+  ctx.save(); ctx.shadowColor = "rgba(19,61,85,.22)"; ctx.shadowBlur = 9; ctx.shadowOffsetY = 3;
+  fillRounded(x, y, width, 33, 15, "rgba(255,255,255,.96)", "#8db8ce");
+  ctx.shadowColor = "transparent";
+  ctx.beginPath(); ctx.moveTo(member.x + 9, y + 33); ctx.lineTo(member.x + 17, y + 33); ctx.lineTo(member.x + 13, y + 42); ctx.closePath(); ctx.fillStyle = "#fff"; ctx.fill(); ctx.strokeStyle = "#8db8ce"; ctx.stroke();
+  text(line, x + width / 2, y + 22, 11, "#234e69", "center"); ctx.restore();
+}
+function drawGem(x, y, gem, label) {
+  const centerX = x + 15; const centerY = y + 15;
+  ctx.save(); ctx.translate(centerX, centerY);
+  ctx.shadowColor = gem.color; ctx.shadowBlur = 18;
+  ctx.beginPath(); ctx.moveTo(0, -18); ctx.lineTo(15, -5); ctx.lineTo(8, 17); ctx.lineTo(-8, 17); ctx.lineTo(-15, -5); ctx.closePath();
+  const gradient = ctx.createLinearGradient(-14, -18, 14, 18); gradient.addColorStop(0, "#ffffff"); gradient.addColorStop(.3, gem.color); gradient.addColorStop(1, gem.dark);
+  ctx.fillStyle = gradient; ctx.fill(); ctx.strokeStyle = "rgba(255,255,255,.7)"; ctx.lineWidth = 2; ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, -17); ctx.lineTo(0, 15); ctx.moveTo(-14, -5); ctx.lineTo(14, -5); ctx.strokeStyle = "rgba(255,255,255,.5)"; ctx.lineWidth = 1.4; ctx.stroke();
+  ctx.restore();
+  if (label) text(label, centerX, y + 52, 12, "#eafaff", "center");
+}
+function drawCoins(x, y) {
+  ctx.save(); ctx.translate(x + 15, y + 14);
+  ctx.shadowColor = "rgba(255,197,49,.75)"; ctx.shadowBlur = 15;
+  circle(0, 0, 15, "#f2bd35", "#96601d");
+  circle(-4, -5, 5, "#fff1a1");
+  ctx.shadowColor = "transparent"; ctx.strokeStyle = "rgba(132,79,20,.42)"; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(0, 0, 10, 0, Math.PI * 2); ctx.stroke();
+  ctx.restore();
+}
+function drawSea() {
+  const sky = ctx.createLinearGradient(0, 0, 0, 576); sky.addColorStop(0, "#79c9eb"); sky.addColorStop(.52, "#d9f4f4"); sky.addColorStop(.53, "#65bed7"); sky.addColorStop(1, "#238ebc");
+  ctx.fillStyle = sky; ctx.fillRect(0, 0, 960, 576);
+  circle(840, 72, 36, "rgba(255,244,178,.95)");
+  for (let index = 0; index < 7; index += 1) {
+    const y = 292 + index * 38; const offset = Math.sin(performance.now() / 700 + index) * 10;
+    ctx.beginPath(); ctx.moveTo(0, y); for (let x = 0; x <= 960; x += 90) ctx.quadraticCurveTo(x + 45, y - 9 + offset, x + 90, y);
+    ctx.strokeStyle = index % 2 ? "rgba(222,250,250,.52)" : "rgba(27,129,175,.28)"; ctx.lineWidth = 3; ctx.stroke();
+  }
+}
+function drawPalm(x, y) {
+  ctx.save(); ctx.translate(x, y);
+  ctx.strokeStyle = "#79543a"; ctx.lineWidth = 12; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(0, 42); ctx.quadraticCurveTo(-4, 3, 4, -27); ctx.stroke();
+  const leaves = [[0,-29,35,-52],[1,-27,-34,-48],[2,-29,39,-32],[-1,-27,-41,-28],[1,-28,20,-60]];
+  leaves.forEach((leaf) => { ctx.beginPath(); ctx.moveTo(leaf[0], leaf[1]); ctx.quadraticCurveTo(leaf[2] / 2, leaf[3] - 4, leaf[2], leaf[3]); ctx.strokeStyle = "#33805e"; ctx.lineWidth = 10; ctx.stroke(); });
+  ctx.restore();
+}
+function drawCave(x, y) {
+  ctx.save(); ctx.translate(x, y);
+  const rock = ctx.createLinearGradient(-70, 0, 75, 160); rock.addColorStop(0, "#8495a4"); rock.addColorStop(1, "#40556c");
+  ctx.beginPath(); ctx.moveTo(-78, 154); ctx.quadraticCurveTo(-70, 78, -36, 42); ctx.quadraticCurveTo(-7, 6, 28, 35); ctx.quadraticCurveTo(74, 67, 82, 154); ctx.closePath(); ctx.fillStyle = rock; ctx.fill();
+  ctx.beginPath(); ctx.moveTo(-32, 154); ctx.quadraticCurveTo(-25, 86, 0, 66); ctx.quadraticCurveTo(31, 91, 37, 154); ctx.closePath(); ctx.fillStyle = "#1c3046"; ctx.fill();
+  ctx.strokeStyle = "rgba(239,255,255,.22)"; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(-59, 101); ctx.quadraticCurveTo(-53, 70, -34, 50); ctx.stroke();
+  ctx.restore();
+}
+function drawShip(x, y) {
+  ctx.save(); ctx.translate(x, y);
+  ctx.shadowColor = "rgba(11,60,78,.25)"; ctx.shadowBlur = 10; ctx.shadowOffsetY = 8;
+  ctx.beginPath(); ctx.moveTo(0, 162); ctx.lineTo(192, 162); ctx.quadraticCurveTo(170, 205, 39, 205); ctx.quadraticCurveTo(12, 194, 0, 162); ctx.closePath();
+  const hull = ctx.createLinearGradient(0, 160, 0, 205); hull.addColorStop(0, "#9a5639"); hull.addColorStop(1, "#593124"); ctx.fillStyle = hull; ctx.fill(); ctx.shadowColor = "transparent";
+  ctx.fillStyle = "#79402e"; ctx.fillRect(27, 152, 145, 14);
+  ctx.strokeStyle = "#f2d6a1"; ctx.lineWidth = 7; ctx.beginPath(); ctx.moveTo(81, 154); ctx.lineTo(81, 25); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(86, 39); ctx.quadraticCurveTo(146, 68, 151, 116); ctx.lineTo(86, 116); ctx.closePath(); ctx.fillStyle = "#f9f1d8"; ctx.fill(); ctx.strokeStyle = "#c9dbe5"; ctx.lineWidth = 2; ctx.stroke();
+  ctx.fillStyle = "#2f729d"; ctx.beginPath(); ctx.moveTo(90, 45); ctx.quadraticCurveTo(128, 68, 140, 106); ctx.lineTo(90, 106); ctx.closePath(); ctx.fill();
+  [50, 122, 151].forEach((windowX) => circle(windowX, 172, 5, "#ffd66d", "#703b2a"));
+  ctx.restore();
+}
+function drawShore() {
+  drawSea();
+  const sand = ctx.createLinearGradient(0, 350, 0, 576); sand.addColorStop(0, "#fff5d7"); sand.addColorStop(1, "#e9c985"); ctx.fillStyle = sand;
+  ctx.beginPath(); ctx.moveTo(0, 356); for (let x = 0; x <= 960; x += 80) ctx.quadraticCurveTo(x + 40, 345 + Math.sin(x) * 6, x + 80, 356); ctx.lineTo(960,576); ctx.lineTo(0,576); ctx.closePath(); ctx.fill();
+  drawPalm(94, 309); drawPalm(826, 312); drawCave(760, 250);
+  const shipBob = Math.sin(performance.now() / 360) * 5; drawShip(115, 130 + shipBob);
+  text("해안가", 480, 59, 26, "#ffffff", "center");
+  if (state.phase === "shoreToCave") drawPortal(765, 390, "동굴로");
+  if (state.phase === "shoreToShip") drawPortal(210, 347, "보물선으로");
+  drawPlayer();
+}
+function drawCaveScene() {
+  const cave = ctx.createRadialGradient(480, 225, 30, 480, 260, 700); cave.addColorStop(0, "#536f8e"); cave.addColorStop(.55, "#283e58"); cave.addColorStop(1, "#14283e");
+  ctx.fillStyle = cave; ctx.fillRect(0, 0, 960, 576);
+  for (let index = 0; index < 9; index += 1) {
+    ctx.beginPath(); ctx.moveTo(index * 130 - 50, 0); ctx.lineTo(index * 130 + 60, 0); ctx.lineTo(index * 130 + 25, 105 + (index % 3) * 36); ctx.closePath();
+    ctx.fillStyle = index % 2 ? "#1e344c" : "#304967"; ctx.fill();
+  }
+  const floor = ctx.createLinearGradient(0, 410, 0, 576); floor.addColorStop(0, "#61768a"); floor.addColorStop(1, "#324a61"); ctx.fillStyle = floor; ctx.fillRect(0, 410, 960, 166);
+  text("보석 동굴", 480, 62, 26, "#e8f7ff", "center");
+  if (!state.carrying) {
+    drawPedestal(478, 345);
+    if (state.condition === "gem") drawGem(463, 270, selectedGem(), selectedGem().label);
+    else { drawCoins(465, 285); text("황금 동전 한 닢", 480, 343, 12, "#edf9ff", "center"); }
+    drawArrow({ x: 480, y: 266 });
+  } else drawPortal(118, 376, "해안가로");
+  drawPlayer();
+}
+function drawPedestal(x, y) {
+  ctx.save(); ctx.translate(x, y);
+  const stone = ctx.createLinearGradient(0, -44, 0, 18); stone.addColorStop(0, "#b5c6cb"); stone.addColorStop(1, "#52697b");
+  ctx.beginPath(); ctx.moveTo(-42, 16); ctx.lineTo(42, 16); ctx.lineTo(28, -22); ctx.lineTo(-28, -22); ctx.closePath(); ctx.fillStyle = stone; ctx.fill(); ctx.strokeStyle = "#314d63"; ctx.lineWidth = 2; ctx.stroke();
+  ctx.restore();
+}
+function drawDeck() {
+  const sky = ctx.createLinearGradient(0, 0, 0, 190); sky.addColorStop(0, "#86d0ed"); sky.addColorStop(1, "#e2f7fb"); ctx.fillStyle = sky; ctx.fillRect(0, 0, 960, 190);
+  const wood = ctx.createLinearGradient(0, 170, 0, 576); wood.addColorStop(0, "#e7be78"); wood.addColorStop(1, "#a96842"); ctx.fillStyle = wood; ctx.fillRect(0, 170, 960, 406);
+  for (let y = 205; y < 560; y += 48) { ctx.strokeStyle = "rgba(103,57,35,.32)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(960,y); ctx.stroke(); }
+  ctx.strokeStyle = "#70402c"; ctx.lineWidth = 12; ctx.beginPath(); ctx.moveTo(0, 170); ctx.lineTo(960,170); ctx.moveTo(0,522); ctx.lineTo(960,522); ctx.stroke();
+  ctx.strokeStyle = "#f3d49b"; ctx.lineWidth = 9; ctx.beginPath(); ctx.moveTo(165,0); ctx.lineTo(165,172); ctx.moveTo(735,0); ctx.lineTo(735,172); ctx.stroke();
+  text("보물선 갑판", 480, 61, 26, "#164b67", "center");
+  deckCrew.forEach(drawCrew); updateCrewBubble();
+  if (activeCrewBubble && performance.now() < activeCrewBubble.expiresAt) drawSpeechBubble(deckCrew[activeCrewBubble.memberIndex], activeCrewBubble.line);
+  const vault = { x: 703, y: 325 }; drawTreasureChest(vault.x, vault.y);
+  if (state.carrying) drawArrow({ x: vault.x + 55, y: vault.y - 2 });
+  text("보물함", vault.x + 56, 454, 14, "#4e2c1d", "center"); drawPlayer();
+}
+function drawTreasureChest(x, y) {
+  ctx.save(); ctx.translate(x, y);
+  ctx.shadowColor = "rgba(59,31,18,.25)"; ctx.shadowBlur = 10; ctx.shadowOffsetY = 6;
+  fillRounded(0, 28, 116, 69, 14, "#8d4e31", "#593121");
+  ctx.shadowColor = "transparent";
+  ctx.beginPath(); ctx.moveTo(7, 35); ctx.quadraticCurveTo(14, 1, 58, 3); ctx.quadraticCurveTo(102, 1, 109, 35); ctx.closePath(); ctx.fillStyle = "#b76c40"; ctx.fill(); ctx.strokeStyle = "#593121"; ctx.lineWidth = 3; ctx.stroke();
+  fillRounded(48, 46, 20, 25, 5, "#f4d169", "#916527");
+  ctx.restore();
+}
+function drawGoldVault(x, y) { drawTreasureChest(x, y); }
+function drawIntro() {
+  drawSea(); drawShip(384, 190); drawCave(754, 270); drawPalm(100, 340); drawPalm(876, 342);
+  const veil = ctx.createLinearGradient(0, 0, 0, 576); veil.addColorStop(0, "rgba(9,45,74,.43)"); veil.addColorStop(1, "rgba(5,25,43,.68)"); ctx.fillStyle = veil; ctx.fillRect(0, 0, 960, 576);
+  titleText("보물찾기", 480, 146, 52, "#fff4b3", "center"); text("비밀 지도에 적힌 마지막 항해", 480, 181, 17, "#f2fbff", "center");
+  text("당신은 보물선의 선장입니다.", 480, 258, 19, "#ffffff", "center");
+  text(state.phase === "intake" ? "오늘의 항해를 선택하세요." : "비밀 지도를 따라 동굴을 향해 출발하세요.", 480, 291, 15, "#d7edf5", "center");
+}
+function drawTreasureMap(x, y) {
+  ctx.save(); ctx.shadowColor = "rgba(11,37,56,.34)"; ctx.shadowBlur = 15; ctx.shadowOffsetY = 7;
+  fillRounded(x, y, 224, 128, 10, "#f5dfaa", "#b3844b"); ctx.shadowColor = "transparent";
+  ctx.fillStyle = "#bee6e3"; fillRounded(x + 13, y + 15, 198, 96, 6, "#bee6e3");
+  ctx.strokeStyle = "#9a7042"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x + 32, y + 88); ctx.bezierCurveTo(x + 73,y + 45,x + 117,y + 112,x + 173,y + 57); ctx.stroke();
+  circle(x + 174, y + 57, 10, "#cc5947"); text("X", x + 174, y + 64, 13, "#fff", "center");
+  text("비밀 지도", x + 112, y + 28, 11, "#6b4b31", "center"); ctx.restore();
+}
+function drawDialogue(title, line1, line2) {
+  ctx.save(); ctx.shadowColor = "rgba(7,29,45,.3)"; ctx.shadowBlur = 18; ctx.shadowOffsetY = 8;
+  fillRounded(88, 335, 784, 150, 22, "rgba(255,255,255,.94)", "rgba(196,225,238,.9)"); ctx.shadowColor = "transparent";
+  text(title, 126, 374, 15, "#ba7645"); text(line1, 480, 416, 14, "#1d4661", "center"); text(line2, 480, 446, 13, "#52718a", "center"); ctx.restore();
+}
+function drawWantedPoster(x, y) {
+  ctx.save(); ctx.shadowColor = "rgba(63,37,17,.35)"; ctx.shadowBlur = 12; ctx.shadowOffsetY = 6;
+  fillRounded(x, y, 230, 260, 9, "#f0dcae", "#9e7143"); ctx.shadowColor = "transparent";
+  fillRounded(x + 15, y + 18, 200, 35, 7, "#b85945"); text("WANTED", x + 115, y + 43, 23, "#fff5dc", "center");
+  text("왕실 보석 분실", x + 115, y + 82, 17, "#6a492d", "center");
+  circle(x + 115, y + 132, 34, "#d8c08a", "#725238");
+  ctx.beginPath(); ctx.moveTo(x + 115, y + 101); ctx.lineTo(x + 137, y + 120); ctx.lineTo(x + 126, y + 157); ctx.lineTo(x + 104, y + 157); ctx.lineTo(x + 93, y + 120); ctx.closePath();
+  ctx.fillStyle = "#654b3a"; ctx.fill(); ctx.strokeStyle = "#463223"; ctx.lineWidth = 2; ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x + 115, y + 103); ctx.lineTo(x + 115, y + 154); ctx.moveTo(x + 94, y + 120); ctx.lineTo(x + 136, y + 120); ctx.strokeStyle = "rgba(255,244,211,.48)"; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.strokeStyle = "#b89260"; ctx.lineWidth = 2; [184,204,224].forEach((lineY) => { ctx.beginPath(); ctx.moveTo(x + 24,lineY + y); ctx.lineTo(x + 205,lineY + y); ctx.stroke(); });
+  text("왕실 항구 검사관", x + 115, y + 247, 11, "#74543d", "center"); ctx.restore();
+}
+function drawHandoff() {
+  const bg = ctx.createLinearGradient(0,0,960,576); bg.addColorStop(0,"#d4e8ef"); bg.addColorStop(1,"#a5c7d5"); ctx.fillStyle = bg; ctx.fillRect(0,0,960,576);
+  fillRounded(96,94,768,382,25,"rgba(255,255,255,.94)","#c1dce7"); drawWantedPoster(137,154);
+  text("항구에 붙은 수배 전단",620,174,27,"#173d59","center");
+  text("왕실의 보석 하나가 동굴에서 분실됐습니다.",620,232,14,"#315b75","center");
+  text("항구 검사관이 보물선의 화물을 확인하기 시작합니다.",620,264,13,"#52718a","center");
+  if (state.condition === "gem") {
+    text("전단 속 보석의 실루엣이",620,314,14,"#8b4e45","center");
+    text("조금 전 동굴에서 본 것과 닮아 보입니다.",620,341,14,"#8b4e45","center");
+    text("왕실 보석과 무관하다는 입장을 지켜야 합니다.",620,378,12,"#526f86","center");
+  } else {
+    text("나는 황금 동전 한 닢을 찾았을 뿐이다.",620,314,15,"#2e6280","center");
+    text("왕실 보석과는 무관하다.",620,347,14,"#526f86","center");
+    text("안심하고 검사관을 만날 수 있습니다.",620,376,13,"#526f86","center");
+  }
+  text("이 테스트 모드에서는 어떤 데이터도 저장하지 않습니다.",620,413,11,"#678299","center");
+}
+function drawPractice() {
+  const background = ctx.createLinearGradient(0, 0, 0, 576);
+  background.addColorStop(0, "#8e969b"); background.addColorStop(1, "#596269");
+  ctx.fillStyle = background; ctx.fillRect(0, 0, 960, 576);
+  const glow = ctx.createRadialGradient(480, 284, 8, 480, 284, 170);
+  glow.addColorStop(0, "rgba(255,255,255,.13)"); glow.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = glow; ctx.fillRect(0, 0, 960, 576);
+  ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 5; ctx.lineCap = "round";
+  ctx.beginPath(); ctx.moveTo(450, 284); ctx.lineTo(510, 284); ctx.moveTo(480, 254); ctx.lineTo(480, 314); ctx.stroke();
+  if (state.practiceAudioFinished) {
+    text(practiceQuestions[state.practiceIndex], 480, 362, 18, "#ffffff", "center");
+    text("답변을 선택해 주세요.", 480, 398, 13, "rgba(255,255,255,.8)", "center");
+  }
+}
+function drawPracticeComplete() {
+  const background = ctx.createLinearGradient(0, 0, 0, 576);
+  background.addColorStop(0, "#dbe9ed"); background.addColorStop(1, "#a7c6d0");
+  ctx.fillStyle = background; ctx.fillRect(0, 0, 960, 576);
+  fillRounded(178, 156, 604, 250, 26, "rgba(255,255,255,.94)", "#bfd6de");
+  text("답변 연습이 끝났습니다.", 480, 235, 27, "#173d59", "center");
+  text("이후 본 검사에서는 검사 장비를 착용한 뒤,", 480, 294, 15, "#42677d", "center");
+  text("방금과 유사한 질문에 같은 방식으로 답하게 됩니다.", 480, 329, 15, "#42677d", "center");
+  text("이 테스트 모드에서는 어떤 데이터도 저장하지 않습니다.", 480, 371, 12, "#6f8897", "center");
+}
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  if (state.phase === "intake") drawIntro(); else if (state.phase === "story") drawStory(); else if (state.phase === "cave") drawCaveScene(); else if (state.phase === "caveIntro" || state.phase === "caveExitStory") drawCaveNarrative(state.phase); else if (state.phase === "deck") drawDeck(); else if (state.phase === "deckIntro") drawDeckNarrative(); else if (state.phase === "handoff") drawHandoff(); else drawShore();
+  if (state.phase === "intake") drawIntro(); else if (state.phase === "story") drawStory(); else if (state.phase === "cave") drawCaveScene(); else if (state.phase === "caveIntro" || state.phase === "caveExitStory") drawCaveNarrative(state.phase); else if (state.phase === "deck") drawDeck(); else if (state.phase === "deckIntro") drawDeckNarrative(); else if (state.phase === "handoff") drawHandoff(); else if (state.phase === "practice") drawPractice(); else if (state.phase === "practiceComplete") drawPracticeComplete(); else drawShore();
 }
 
 function intakeMarkup() {
@@ -308,6 +638,9 @@ function bindActions() {
   document.querySelector("#start-cave-explore")?.addEventListener("click", startCaveExplore);
   document.querySelector("#resume-cave-exit")?.addEventListener("click", resumeCaveExit);
   document.querySelector("#start-deck-loading")?.addEventListener("click", startDeckLoading);
+  document.querySelector("#start-practice")?.addEventListener("click", startPractice);
+  document.querySelector("#practice-yes")?.addEventListener("click", () => answerPractice("yes"));
+  document.querySelector("#practice-no")?.addEventListener("click", () => answerPractice("no"));
   document.querySelector("#finish-game")?.addEventListener("click", finishGame);
   document.querySelector("#new-session")?.addEventListener("click", resetGame);
 }
@@ -318,7 +651,9 @@ function updateScreen() {
   else if (state.phase === "caveIntro") setActions('<button id="start-cave-explore" class="pixel-button" type="button">동굴 탐색 시작</button>');
   else if (state.phase === "caveExitStory") setActions('<button id="resume-cave-exit" class="pixel-button" type="button">해안가 포탈 찾기</button>');
   else if (state.phase === "deckIntro") setActions('<button id="start-deck-loading" class="pixel-button" type="button">화물 적재하기</button>');
-  else if (state.phase === "handoff") setActions(`<button id="finish-game" class="pixel-button" type="button">${state.testMode ? "시연 종료" : "게임 기록 완료"}</button>`);
+  else if (state.phase === "handoff") setActions('<button id="start-practice" class="pixel-button" type="button">검사 연습 시작</button>');
+  else if (state.phase === "practice" && state.practiceAudioFinished) setActions('<button id="practice-yes" class="pixel-button quiet" type="button">예</button><button id="practice-no" class="pixel-button" type="button">아니오</button>');
+  else if (state.phase === "practiceComplete") setActions('<button id="finish-game" class="pixel-button" type="button">검사 연습 완료</button>');
   else setActions("");
   ui.message.textContent = state.notification;
   bindActions(); draw();
@@ -355,15 +690,68 @@ function enterDeck() {
 function startDeckLoading() { state.phase = "deck"; setMessage("오른쪽 보물함 앞에서 SPACE를 누르세요."); updateScreen(); canvas.focus(); }
 function pickupTreasure() {
   state.carrying = state.condition === "gem" ? "gem" : "coins";
-  record(state.condition === "gem" ? "gem_pickup" : "coin_pickup", state.condition === "gem" ? `${selectedGem().label} 획득` : "금화 상자 획득");
+  record(state.condition === "gem" ? "gem_pickup" : "coin_pickup", state.condition === "gem" ? `${selectedGem().label} 획득` : "황금 동전 획득");
   state.phase = "caveExitStory"; setMessage("보물을 손에 넣었습니다."); updateScreen();
 }
 function depositTreasure() {
-  const detail = state.condition === "gem" ? `${selectedGem().label} → 보물함` : "금화 상자 → 보물함";
+  const detail = state.condition === "gem" ? `${selectedGem().label} → 보물함` : "황금 동전 한 닢 → 보물함";
   record(state.condition === "gem" ? "gem_deposited" : "coins_deposited", detail, { assigned_chest: "treasure_chest" });
   state.carrying = null; state.phase = "handoff";
   if (!state.testMode) { createCitSchedule(); record("exam_handoff_onset", "게임 완료 · 동공 및 폴리그래프 검사 준비", { cit_trial_count: state.citSchedule.length }); }
   setMessage(state.testMode ? "시연을 완료했습니다. 데이터는 저장되지 않았습니다." : "게임 기록을 보관했습니다. 이제 생리검사를 준비하세요."); updateScreen();
+}
+function completePracticeAudio() {
+  if (state.phase !== "practice") return;
+  state.practiceAudioFinished = true;
+  setMessage("질문을 들었습니다. 예 또는 아니오를 선택해 주세요.");
+  updateScreen();
+}
+function speakPracticeFallback() {
+  if (!("speechSynthesis" in window)) { completePracticeAudio(); return; }
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(practiceQuestions[state.practiceIndex]);
+  utterance.lang = "ko-KR";
+  utterance.rate = .9;
+  utterance.pitch = 1;
+  utterance.onend = completePracticeAudio;
+  utterance.onerror = completePracticeAudio;
+  window.speechSynthesis.speak(utterance);
+}
+function playPracticeQuestion() {
+  if (state.phase !== "practice") return;
+  let usingFallback = false;
+  const startFallback = () => {
+    if (usingFallback) return;
+    usingFallback = true;
+    speakPracticeFallback();
+  };
+  const audio = new Audio(practiceAudioFiles[state.practiceIndex]);
+  audio.preload = "auto";
+  audio.onended = completePracticeAudio;
+  audio.onerror = startFallback;
+  audio.play().catch(startFallback);
+}
+function startPractice() {
+  state.phase = "practice";
+  state.practiceIndex = 0;
+  state.practiceAudioFinished = false;
+  setMessage("중앙 십자를 바라보고 질문을 들어 주세요.");
+  updateScreen();
+  window.setTimeout(playPracticeQuestion, 250);
+}
+function answerPractice(answer) {
+  record("practice_response", "연습 문항 " + (state.practiceIndex + 1) + " · " + answer);
+  if (state.practiceIndex < practiceQuestions.length - 1) {
+    state.practiceIndex += 1;
+    state.practiceAudioFinished = false;
+    setMessage("다음 질문을 듣고 중앙 십자를 바라봐 주세요.");
+    updateScreen();
+    window.setTimeout(playPracticeQuestion, 450);
+    return;
+  }
+  state.phase = "practiceComplete";
+  setMessage("검사 연습을 완료했습니다. 데이터는 저장되지 않았습니다.");
+  updateScreen();
 }
 function createCitSchedule() {
   if (state.citSchedule.length) return;
@@ -376,7 +764,7 @@ function createCitSchedule() {
   }
   saveTemporary();
 }
-function finishGame() { if (!state.testMode) record("game_record_complete", "게임 단계 기록 완료"); setMessage(state.testMode ? "데이터를 저장하지 않고 시연을 마쳤습니다." : "게임 단계가 완료되었습니다. CSV 파일을 검사 세션 폴더에 함께 보관하세요."); setActions('<button id="new-session" class="pixel-button" type="button">처음으로</button>'); bindActions(); }
+function finishGame() { if (!state.testMode) record("game_record_complete", "게임 단계 기록 완료"); setMessage(state.testMode ? "검사 연습을 마쳤습니다. 데이터는 저장되지 않았습니다." : "게임 단계가 완료되었습니다. CSV 파일을 검사 세션 폴더에 함께 보관하세요."); setActions('<button id="new-session" class="pixel-button" type="button">처음으로</button>'); bindActions(); }
 
 function interact() {
   if (state.phase === "shoreToCave") { if (near({ x: 765, y: 405 }, 78)) enterCave(); else setMessage("빛나는 동굴 포탈 가까이에서 SPACE를 누르세요."); return; }
@@ -439,6 +827,7 @@ async function sendSessionToSupabase() {
   } catch { }
 }
 function resetGame() {
+  if ("speechSynthesis" in window) window.speechSynthesis.cancel();
   state = newState(); player.x = 130; player.y = 425; activeCrewBubble = null; nextCrewBubbleAt = 0; crewTurn = 0; crewLineTurn = 0; updateStorageStatus(); record("session_created", "새 게임 세션 생성"); setMessage(state.notification); updateScreen(); renderEventLog();
 }
 

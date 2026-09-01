@@ -8,7 +8,6 @@ const navItems = [
   { href: "/research", label: "Research", meta: "Current questions" },
   { href: "/members", label: "Members", meta: "People in the lab" },
   { href: "/pupillometry", label: "Pupillometry", meta: "Measurement work" },
-  { href: "/treasure-hunt", label: "Treasure Hunt", meta: "Interactive expedition demo" },
   { href: "/publications", label: "Publications", meta: "Papers and output" },
   { href: "/alumni", label: "Alumni", meta: "Former members" },
 ];
