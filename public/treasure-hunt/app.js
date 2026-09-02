@@ -297,7 +297,7 @@ function drawHighlightedStory(target) {
   if (state.condition === "gem") {
     drawEmphasisLine([
       { value: "비밀 지도는 해안 동굴 깊은 곳의 ", color: "#1d4661" },
-      { value: target.label, color: target.color, strong: true },
+      { value: target.label, color: "#287a93", strong: true },
       { value: objectForm(target.label).slice(target.label.length) + " 가리킵니다.", color: "#1d4661" },
     ], 414, 14);
   } else {
