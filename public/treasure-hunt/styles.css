@@ -94,6 +94,8 @@ h2 { font-size: 1.7rem; line-height: 1.1; }
   background: linear-gradient(90deg, rgba(255,255,255,.97), rgba(240,249,252,.96));
 }
 .hud-block { display: flex; flex-direction: column; gap: 2px; }
+.hud-block.treasure-value { align-items: center; text-align: center; }
+.hud-block.treasure-value strong { color: #a66c1e; }
 .hud-block.right { align-items: flex-end; }
 .hud-label { color: #7b91a1; font-size: .84rem; font-weight: 700; }
 .hud strong { color: #17405d; font-size: 1.32rem; line-height: 1.15; }

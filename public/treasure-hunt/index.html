@@ -23,6 +23,7 @@
       <section class="game-frame" aria-label="픽셀 보물찾기 게임">
         <div class="hud">
           <div class="hud-block"><span class="hud-label">현재 목표</span><strong id="quest-title">참가자 정보를 입력하세요</strong></div>
+          <div class="hud-block treasure-value"><span class="hud-label">보물함 가치</span><strong id="treasure-value">0 크라운</strong></div>
           <div class="hud-block right"><span class="hud-label">진행</span><strong id="quest-progress">준비</strong></div>
         </div>
         <canvas id="game-canvas" width="960" height="576" tabindex="0" aria-label="화살표 또는 WASD로 이동하고 스페이스바로 대상과 상호작용하는 게임 화면"></canvas>
@@ -40,12 +41,12 @@
         <div class="research-controls">
           <label for="condition-select">게임 조건</label>
           <select id="condition-select"><option value="gem">보석 경험 조건</option><option value="coins">금화 비교 조건</option></select>
-          <label for="gem-select">목표 보석</label>
-          <select id="gem-select"><option value="ruby">붉은빛 루비</option><option value="sapphire">푸른빛 사파이어</option><option value="emerald" selected>초록빛 에메랄드</option><option value="topaz">황금빛 토파즈</option><option value="amethyst">보랏빛 자수정</option></select>
+          <label for="gem-select">핵심 자극</label>
+          <select id="gem-select"><option value="diamond" selected>다이아몬드</option></select>
           <button id="download-events" class="pixel-button quiet" type="button">게임 이벤트 CSV</button>
           <button id="download-cit" class="pixel-button quiet" type="button">CIT 순서표 CSV</button>
         </div>
-        <p class="research-note">참가자에게는 이 패널을 열지 않습니다. 보석 조건에서는 목표 보석을 경험하고, 금화 조건에서는 보석 정보를 노출하지 않은 채 동일한 이동·획득·적재 과정을 진행합니다.</p>
+        <p class="research-note">참가자에게는 이 패널을 열지 않습니다. 보석 조건에서는 다이아몬드를 경험하고, 금화 조건에서는 다이아몬드 정보를 노출하지 않은 채 동일한 이동·획득·적재 과정을 진행합니다. CIT 후보는 다이아몬드·귀중한 반지·은제 회중시계·금괴·클로버 장식이며, 금화는 검사 후보에서 제외합니다.</p>
         <p id="storage-status" class="storage-status">저장 위치: 이 브라우저의 임시 기록</p>
         <div id="event-log" class="event-log is-hidden"></div>
       </details>

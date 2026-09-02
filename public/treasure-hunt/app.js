@@ -1,21 +1,29 @@
 const canvas = document.querySelector("#game-canvas");
 const ctx = canvas.getContext("2d");
 ctx.imageSmoothingEnabled = true;
+const routeParams = new URLSearchParams(window.location.search);
+const studyMode = routeParams.get("study") === "1";
+const citReturned = routeParams.get("cit") === "complete";
 
 const ui = {
   questTitle: document.querySelector("#quest-title"), questProgress: document.querySelector("#quest-progress"),
   message: document.querySelector("#game-message"), actions: document.querySelector("#screen-actions"),
-  sessionChip: document.querySelector("#session-chip"), eventLog: document.querySelector("#event-log"),
+  sessionChip: document.querySelector("#session-chip"), treasureValue: document.querySelector("#treasure-value"), eventLog: document.querySelector("#event-log"),
   condition: document.querySelector("#condition-select"), gem: document.querySelector("#gem-select"),
   storageStatus: document.querySelector("#storage-status"),
 };
 
 const gems = [
-  { id: "ruby", label: "붉은빛 루비", color: "#df4a4f", dark: "#9a2934" },
-  { id: "sapphire", label: "푸른빛 사파이어", color: "#3e7cda", dark: "#23488e" },
-  { id: "emerald", label: "초록빛 에메랄드", color: "#54e88b", dark: "#1f7e4b" },
-  { id: "topaz", label: "황금빛 토파즈", color: "#e0a93a", dark: "#a56c1e" },
-  { id: "amethyst", label: "보랏빛 자수정", color: "#9664c3", dark: "#623f88" },
+  { id: "diamond", label: "다이아몬드", color: "#eaf9fc", dark: "#6f8f9d" },
+];
+// 금화는 진실 집단이 게임 안에서 획득하는 물건이며, CIT 검사 후보에는 넣지 않는다.
+// 검사 후보는 동일한 흑백 삽화 규격으로 제시할 것을 전제로 한 별도 목록이다.
+const citCandidates = [
+  { id: "jewel", label: "다이아몬드" },
+  { id: "ring", label: "귀중한 반지" },
+  { id: "watch", label: "은제 회중시계" },
+  { id: "gold_bar", label: "금괴" },
+  { id: "clover", label: "클로버 장식" },
 ];
 const room = { x: 32, y: 30, w: 896, h: 500 };
 const player = { x: 130, y: 425, size: 44, facing: "right" };
@@ -29,6 +37,7 @@ const practiceQuestions = [
   "당신은 동굴에서 오래된 나침반을 가져갔습니까?",
   "당신은 동굴에서 산호 장식을 가져갔습니까?",
 ];
+const practiceItems = ["pearl", "compass", "coral"];
 const practiceAudioFiles = [
   "/treasure-hunt/audio/practice-01-pearl.mp3",
   "/treasure-hunt/audio/practice-02-compass.mp3",
@@ -56,8 +65,8 @@ function objectForm(noun) {
 
 function newState() {
   return {
-    id: makeId(), phase: "intake", condition: ui.condition.value, targetGem: ui.gem.value,
-    testMode: true, participant: {}, carrying: null, chest: null, storyPage: 0, practiceIndex: 0, practiceAudioFinished: false, events: [], citSchedule: [], notification: "시연할 집단을 선택하세요. 이 모드에서는 데이터를 저장하지 않습니다.",
+    id: makeId(), phase: studyMode ? "story" : "intake", condition: routeParams.get("condition") || ui.condition.value, targetGem: ui.gem.value,
+    testMode: !studyMode, participant: studyMode ? { code: routeParams.get("participant") || "" } : {}, carrying: null, chest: null, chestValue: 0, storyPage: 0, practiceStimulusVisible: false, practiceIndex: 0, practiceAudioFinished: false, events: [], citSchedule: [], notification: studyMode ? "비밀 지도를 따라 동굴을 향해 출발하세요." : "시연할 집단을 선택하세요. 이 모드에서는 데이터를 저장하지 않습니다.",
   };
 }
 
@@ -88,13 +97,14 @@ function updateHud() {
     intake: ["시연 집단 선택", "준비"], story: ["항해 이야기", `${state.storyPage + 1} / 3`], caveIntro: ["동굴 탐색", "2 / 4"], caveExitStory: ["보물 회수", "2 / 4"], deckIntro: ["선박 적재", "4 / 4"],
     shoreToCave: ["동굴 입구로 이동", "1 / 4"], cave: [state.carrying ? "해안으로 돌아가기" : (state.condition === "gem" ? `${target.label} 획득` : "황금 동전 획득"), "2 / 4"],
     shoreToShip: ["보물선으로 이동", "3 / 4"], deck: [state.carrying ? "화물함에 적재" : "적재 완료" , "4 / 4"],
-    handoff: ["답변 연습 안내", "준비"],
+    handoff: ["왕실 검사관 안내", "검사 준비"],
     practice: ["답변 연습", `${state.practiceIndex + 1} / ${practiceQuestions.length}`],
-    practiceComplete: ["답변 연습 완료", "완료"],
+    practiceComplete: ["답변 연습 완료", "완료"], debrief: ["디브리핑", "완료"],
   };
   const [title, progress] = labels[state.phase] || labels.intake;
   ui.questTitle.textContent = title;
   ui.questProgress.textContent = progress;
+  ui.treasureValue.textContent = `${new Intl.NumberFormat("ko-KR").format(state.chestValue || 0)} 크라운`;
   const conditionName = state.condition === "gem" ? "보석 집단(거짓)" : "금화 집단(진실)";
   ui.sessionChip.textContent = state.testMode ? `테스트 모드 · ${conditionName}` : (state.participant.code ? `${state.participant.code} · ${conditionName}` : "참가자 입력 대기");
 }
@@ -254,9 +264,9 @@ function drawStory() {
   drawTreasureMap(650, 188);
   const target = selectedGem();
   const pages = [
-    ["폭풍을 건넌 지 여러 날, 보물선의 식량과 금화는 바닥을 보입니다.", "선원들은 선장의 마지막 항해에 조용히 기대를 걸고 있습니다."],
+    ["긴 항해 끝에 보물선의 보물함은 텅 비었습니다.", "선원들은 이번 항해의 성과에 조용히 기대를 걸고 있습니다."],
     state.condition === "gem"
-      ? [`비밀 지도는 해안 동굴 깊은 곳의 ${objectForm(target.label)} 가리킵니다.`, "그 보석을 찾아 보물선의 화물함에 안전하게 실으세요."]
+      ? [`비밀 지도는 해안 동굴 깊은 곳의 ${objectForm(target.label)} 가리킵니다.`, "그 다이아몬드를 찾아 보물선의 화물함에 안전하게 실으세요."]
       : ["비밀 지도는 해안 동굴 깊은 곳의 황금 동전 한 닢을 가리킵니다.", "그 동전을 찾아 보물선의 보물함에 안전하게 실으세요."],
     ["해안에 닿았습니다. 동굴과 보물선 사이를 오가며 임무를 완수하세요.", "이동: 화살표 / WASD · 포탈·물체 앞에서 SPACE"],
   ];
@@ -283,7 +293,7 @@ function drawEmphasisLine(parts, y, size) {
   ctx.restore();
 }
 function drawHighlightedStory(target) {
-  drawDialogue("선장의 항해일지", "", state.condition === "gem" ? "그 보석을 찾아 보물선의 화물함에 안전하게 실으세요." : "그 동전을 찾아 보물선의 보물함에 안전하게 실으세요.");
+  drawDialogue("선장의 항해일지", "", state.condition === "gem" ? "그 다이아몬드를 찾아 보물선의 화물함에 안전하게 실으세요." : "그 동전을 찾아 보물선의 보물함에 안전하게 실으세요.");
   if (state.condition === "gem") {
     drawEmphasisLine([
       { value: "비밀 지도는 해안 동굴 깊은 곳의 ", color: "#1d4661" },
@@ -304,16 +314,16 @@ function drawDialogue(title, line1, line2) {
 }
 function drawCaveNarrative(phase) {
   drawCaveScene();
-  if (phase === "caveIntro") drawDialogue("동굴 입구", "파도 소리는 멀어지고, 차가운 물방울 소리만 동굴 안에 울립니다.", state.condition === "gem" ? "희미한 빛이 제단 위의 보석을 비추고 있습니다." : "희미한 빛이 제단 위의 황금 동전 하나를 비추고 있습니다.");
+  if (phase === "caveIntro") drawDialogue("동굴 입구", "파도 소리는 멀어지고, 차가운 물방울 소리만 동굴 안에 울립니다.", state.condition === "gem" ? "희미한 빛이 제단 위의 다이아몬드를 비추고 있습니다." : "희미한 빛이 제단 위의 황금 동전 하나를 비추고 있습니다.");
   else drawDialogue("보물 회수", state.condition === "gem" ? "손안의 보석은 묵직하고 차갑습니다." : "손안의 황금 동전은 따뜻하게 빛납니다.", "기다리고 있을 선원들에게 돌아가기 위해 해안가 포탈을 찾으세요.");
 }
 function drawDeckNarrative() {
-  drawDeck(); drawDialogue("보물선 갑판", "선원들이 난간 너머로 당신을 발견하고, 배 위가 잠시 술렁입니다.", state.condition === "gem" ? "보석을 보물함에 넣어 항해의 성과를 지키세요." : "황금 동전을 보물함에 넣어 항해의 성과를 지키세요.");
+  drawDeck(); drawDialogue("보물선 갑판", "선원들이 난간 너머로 당신을 발견하고, 배 위가 잠시 술렁입니다.", "보물을 보물함에 적재하면 항해의 가치는 20,000 크라운이 됩니다.");
 }
 function drawWantedPoster(x, y) {
   pixelRect(x, y, 230, 260, "#ead9ae", "#513d2b");
   ctx.fillStyle = "#9b552f"; ctx.fillRect(x + 15, y + 18, 200, 33); text("WANTED", x + 115, y + 42, 20, "#f8edcf", "center");
-  text("왕실 보석 분실", x + 115, y + 79, 16, "#513d2b", "center");
+  text("왕실의 다이아몬드 분실", x + 115, y + 79, 14, "#513d2b", "center");
   ctx.fillStyle = "#513d2b"; ctx.fillRect(x + 83, y + 99, 64, 67); ctx.fillStyle = "#d8c08a"; ctx.fillRect(x + 90, y + 106, 50, 53);
   text("?", x + 115, y + 148, 36, "#513d2b", "center");
   ctx.fillStyle = "#a98558"; ctx.fillRect(x + 20, y + 184, 190, 2); ctx.fillRect(x + 20, y + 203, 190, 2); ctx.fillRect(x + 20, y + 222, 155, 2);
@@ -323,7 +333,7 @@ function drawHandoff() {
   ctx.fillStyle = "#e5e5df"; ctx.fillRect(0, 0, 960, 576); pixelRect(96, 94, 768, 382, "#f8edcf"); drawWantedPoster(137, 154);
   if (state.testMode) {
     text("항구에 붙은 수배 전단", 582, 174, 24, "#183750", "center");
-    text("왕실의 보석 하나가 동굴에서 분실됐습니다.", 582, 232, 14, "#27455c", "center");
+    text("왕실의 다이아몬드가 동굴에서 분실됐습니다.", 582, 232, 14, "#27455c", "center");
     text("항구 검사관이 보물선의 화물을 확인하기 시작합니다.", 582, 264, 13, "#47677c", "center");
     text(state.condition === "gem" ? "보석 집단(거짓) 시연을 완료했습니다." : "금화 집단(진실) 시연을 완료했습니다.", 582, 317, 13, "#47677c", "center");
     text("이 테스트 모드에서는 어떤 데이터도 저장하지 않습니다.", 582, 353, 12, "#557083", "center");
@@ -331,7 +341,7 @@ function drawHandoff() {
     return;
   }
   text("검사 준비 완료", 582, 174, 28, "#183750", "center");
-  text("왕실 보석 하나가 동굴에서 사라졌습니다.", 582, 226, 14, "#27455c", "center");
+  text("왕실의 다이아몬드가 동굴에서 사라졌습니다.", 582, 226, 14, "#27455c", "center");
   text("검사관은 보석의 정체를 알고 있습니다.", 582, 255, 14, "#27455c", "center");
   text("이제 검사 장비의 기록을 시작한 뒤, 질문에는 모두 ‘아니요’로 응답합니다.", 582, 300, 12, "#47677c", "center");
   text("CIT 순서표: 후보 5종 × 5회 = 25 문항", 582, 340, 12, "#47677c", "center");
@@ -545,6 +555,32 @@ function drawTreasureChest(x, y) {
   fillRounded(48, 46, 20, 25, 5, "#f4d169", "#916527");
   ctx.restore();
 }
+function drawTreasureValuePanel(x, y) {
+  const value = new Intl.NumberFormat("ko-KR").format(state.chestValue || 0);
+  ctx.save();
+  ctx.shadowColor = "rgba(10,40,59,.28)"; ctx.shadowBlur = 10; ctx.shadowOffsetY = 4;
+  fillRounded(x - 151, y - 25, 302, 54, 18, "rgba(255,255,255,.94)", "#bcdbe8");
+  ctx.shadowColor = "transparent";
+  text("보물함 가치", x - 119, y + 7, 13, "#54748a");
+  text(`${value} 크라운`, x + 124, y + 9, 19, state.chestValue ? "#b47726" : "#466a81", "right");
+  ctx.restore();
+}
+function drawInspector(x, y) {
+  ctx.save(); ctx.translate(x, y);
+  ctx.shadowColor = "rgba(18,48,68,.26)"; ctx.shadowBlur = 8; ctx.shadowOffsetY = 5;
+  circle(-11, 52, 8, "#293a47"); circle(13, 52, 8, "#293a47");
+  ctx.shadowColor = "transparent";
+  fillRounded(-28, 3, 57, 52, 15, "#425f75", "#183a54");
+  ctx.fillStyle = "#d4b557"; ctx.fillRect(-5, 13, 10, 30);
+  circle(0, -12, 22, "#e9bb91", "#6f4838");
+  ctx.fillStyle = "#263d52"; ctx.beginPath(); ctx.arc(0, -17, 22, Math.PI, Math.PI * 2); ctx.fill();
+  fillRounded(-27, -32, 54, 16, 8, "#183a54", "#102f48");
+  ctx.fillStyle = "#d5ba64"; ctx.fillRect(-4, -29, 8, 6);
+  circle(7, -11, 2, "#183247");
+  circle(17, 17, 7, "#e6c863", "#755b22");
+  text("검사관", 0, 83, 11, "#274b62", "center");
+  ctx.restore();
+}
 function drawGoldVault(x, y) { drawTreasureChest(x, y); }
 function drawIntro() {
   drawSea(); drawShip(384, 190); drawCave(754, 270); drawPalm(100, 340); drawPalm(876, 342);
@@ -570,43 +606,65 @@ function drawWantedPoster(x, y) {
   ctx.save(); ctx.shadowColor = "rgba(63,37,17,.35)"; ctx.shadowBlur = 12; ctx.shadowOffsetY = 6;
   fillRounded(x, y, 230, 260, 9, "#f0dcae", "#9e7143"); ctx.shadowColor = "transparent";
   fillRounded(x + 15, y + 18, 200, 35, 7, "#b85945"); text("WANTED", x + 115, y + 43, 23, "#fff5dc", "center");
-  text("왕실 보석 분실", x + 115, y + 82, 17, "#6a492d", "center");
+  text("왕실의 다이아몬드 분실", x + 115, y + 82, 14, "#6a492d", "center");
   circle(x + 115, y + 132, 34, "#d8c08a", "#725238");
-  ctx.beginPath(); ctx.moveTo(x + 115, y + 101); ctx.lineTo(x + 137, y + 120); ctx.lineTo(x + 126, y + 157); ctx.lineTo(x + 104, y + 157); ctx.lineTo(x + 93, y + 120); ctx.closePath();
-  ctx.fillStyle = "#654b3a"; ctx.fill(); ctx.strokeStyle = "#463223"; ctx.lineWidth = 2; ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(x + 115, y + 103); ctx.lineTo(x + 115, y + 154); ctx.moveTo(x + 94, y + 120); ctx.lineTo(x + 136, y + 120); ctx.strokeStyle = "rgba(255,244,211,.48)"; ctx.lineWidth = 1.5; ctx.stroke();
+  text("?", x + 115, y + 148, 38, "#654b3a", "center");
   ctx.strokeStyle = "#b89260"; ctx.lineWidth = 2; [184,204,224].forEach((lineY) => { ctx.beginPath(); ctx.moveTo(x + 24,lineY + y); ctx.lineTo(x + 205,lineY + y); ctx.stroke(); });
   text("왕실 항구 검사관", x + 115, y + 247, 11, "#74543d", "center"); ctx.restore();
 }
 function drawHandoff() {
   const bg = ctx.createLinearGradient(0,0,960,576); bg.addColorStop(0,"#d4e8ef"); bg.addColorStop(1,"#a5c7d5"); ctx.fillStyle = bg; ctx.fillRect(0,0,960,576);
-  fillRounded(96,94,768,382,25,"rgba(255,255,255,.94)","#c1dce7"); drawWantedPoster(137,154);
-  text("항구에 붙은 수배 전단",620,174,27,"#173d59","center");
-  text("왕실의 보석 하나가 동굴에서 분실됐습니다.",620,232,14,"#315b75","center");
-  text("항구 검사관이 보물선의 화물을 확인하기 시작합니다.",620,264,13,"#52718a","center");
-  if (state.condition === "gem") {
-    text("전단 속 보석의 실루엣이",620,314,14,"#8b4e45","center");
-    text("조금 전 동굴에서 본 것과 닮아 보입니다.",620,341,14,"#8b4e45","center");
-    text("왕실 보석과 무관하다는 입장을 지켜야 합니다.",620,378,12,"#526f86","center");
+  fillRounded(48,58,864,460,25,"rgba(255,255,255,.94)","#c1dce7"); drawWantedPoster(89,148); drawInspector(376,310);
+  text("왕실 검사관의 안내",655,128,27,"#173d59","center");
+  text("왕실의 다이아몬드가 동굴에서 분실됐습니다.",655,183,14,"#315b75","center");
+  text("모든 보물선을 직접 수색할 수는 없습니다.",655,223,14,"#315b75","center");
+  text("선장님은 심리생리 검사를 통해 화물 관련 여부를 확인받습니다.",655,253,13,"#52718a","center");
+  fillRounded(487,282,337,74,15,"#fff5dc","#e4c781");
+  text("검사에서 왕실의 다이아몬드를 가져간 사실이 확인되면",655,310,12,"#734734","center");
+  text("현재 보물함은 왕실 국고로 귀속됩니다.",655,338,13,"#734734","center");
+  drawTreasureValuePanel(655, 399);
+  text("항해 종료 후 교환소에서 보물함 가치를 정산할 수 있습니다.",655,447,12,"#52718a","center");
+  text("이 테스트 모드에서는 어떤 데이터도 저장하지 않습니다.",655,483,11,"#678299","center");
+}
+function drawPracticeStimulus(item) {
+  const x = 480; const y = 250;
+  ctx.save(); ctx.translate(x, y);
+  ctx.fillStyle = "#d8dde0"; ctx.fillRect(-92, -92, 184, 184);
+  ctx.strokeStyle = "#f6f7f7"; ctx.lineWidth = 3; ctx.strokeRect(-92, -92, 184, 184);
+  ctx.fillStyle = "#3d454b";
+  if (item === "pearl") {
+    ctx.fillRect(-28, -42, 56, 10); ctx.fillRect(-44, -26, 88, 52); ctx.fillRect(-28, 26, 56, 16);
+    ctx.fillStyle = "#aeb6bb"; ctx.fillRect(-28, -26, 56, 52); ctx.fillRect(-42, -10, 84, 20);
+    ctx.fillStyle = "#f3f5f4"; ctx.fillRect(-22, -22, 25, 19); ctx.fillRect(-34, -5, 20, 14);
+  } else if (item === "compass") {
+    ctx.fillRect(-44, -44, 88, 88); ctx.fillStyle = "#c9d0d4"; ctx.fillRect(-35, -35, 70, 70);
+    ctx.fillStyle = "#3d454b"; ctx.fillRect(-7, -29, 14, 58); ctx.fillRect(-29, -7, 58, 14);
+    ctx.fillStyle = "#f3f5f4"; ctx.fillRect(-7, -23, 14, 23); ctx.fillRect(0, -7, 23, 14);
   } else {
-    text("나는 황금 동전 한 닢을 찾았을 뿐이다.",620,314,15,"#2e6280","center");
-    text("왕실 보석과는 무관하다.",620,347,14,"#526f86","center");
-    text("안심하고 검사관을 만날 수 있습니다.",620,376,13,"#526f86","center");
+    ctx.fillRect(-8, -50, 16, 100); ctx.fillRect(-48, -18, 40, 14); ctx.fillRect(8, -36, 40, 14); ctx.fillRect(-42, 14, 34, 14); ctx.fillRect(8, 24, 42, 14);
+    ctx.fillStyle = "#aeb6bb"; ctx.fillRect(-30, -36, 22, 18); ctx.fillRect(8, -54, 20, 18); ctx.fillRect(-52, 6, 22, 18); ctx.fillRect(8, 42, 22, 18);
+    ctx.fillStyle = "#f3f5f4"; ctx.fillRect(-25, -31, 10, 8); ctx.fillRect(13, -49, 9, 8); ctx.fillRect(-47, 11, 9, 8); ctx.fillRect(13, 47, 9, 8);
   }
-  text("이 테스트 모드에서는 어떤 데이터도 저장하지 않습니다.",620,413,11,"#678299","center");
+  ctx.restore();
 }
 function drawPractice() {
   const background = ctx.createLinearGradient(0, 0, 0, 576);
   background.addColorStop(0, "#8e969b"); background.addColorStop(1, "#596269");
   ctx.fillStyle = background; ctx.fillRect(0, 0, 960, 576);
-  const glow = ctx.createRadialGradient(480, 284, 8, 480, 284, 170);
-  glow.addColorStop(0, "rgba(255,255,255,.13)"); glow.addColorStop(1, "rgba(255,255,255,0)");
-  ctx.fillStyle = glow; ctx.fillRect(0, 0, 960, 576);
-  ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 5; ctx.lineCap = "round";
-  ctx.beginPath(); ctx.moveTo(450, 284); ctx.lineTo(510, 284); ctx.moveTo(480, 254); ctx.lineTo(480, 314); ctx.stroke();
+  if (!state.practiceStimulusVisible) {
+    const glow = ctx.createRadialGradient(480, 284, 8, 480, 284, 170);
+    glow.addColorStop(0, "rgba(255,255,255,.13)"); glow.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = glow; ctx.fillRect(0, 0, 960, 576);
+    ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 5; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(450, 284); ctx.lineTo(510, 284); ctx.moveTo(480, 254); ctx.lineTo(480, 314); ctx.stroke();
+    text("중앙 십자를 바라봐 주세요.", 480, 388, 14, "rgba(255,255,255,.8)", "center");
+    return;
+  }
+  text("사물을 보고 질문을 들어 주세요.", 480, 102, 14, "rgba(255,255,255,.82)", "center");
+  drawPracticeStimulus(practiceItems[state.practiceIndex]);
   if (state.practiceAudioFinished) {
-    text(practiceQuestions[state.practiceIndex], 480, 362, 18, "#ffffff", "center");
-    text("답변을 선택해 주세요.", 480, 398, 13, "rgba(255,255,255,.8)", "center");
+    text(practiceQuestions[state.practiceIndex], 480, 396, 18, "#ffffff", "center");
+    text("답변을 선택해 주세요.", 480, 430, 13, "rgba(255,255,255,.8)", "center");
   }
 }
 function drawPracticeComplete() {
@@ -614,14 +672,27 @@ function drawPracticeComplete() {
   background.addColorStop(0, "#dbe9ed"); background.addColorStop(1, "#a7c6d0");
   ctx.fillStyle = background; ctx.fillRect(0, 0, 960, 576);
   fillRounded(178, 156, 604, 250, 26, "rgba(255,255,255,.94)", "#bfd6de");
-  text("답변 연습이 끝났습니다.", 480, 235, 27, "#173d59", "center");
-  text("이후 본 검사에서는 검사 장비를 착용한 뒤,", 480, 294, 15, "#42677d", "center");
-  text("방금과 유사한 질문에 같은 방식으로 답하게 됩니다.", 480, 329, 15, "#42677d", "center");
-  text("이 테스트 모드에서는 어떤 데이터도 저장하지 않습니다.", 480, 371, 12, "#6f8897", "center");
+  text("답변 연습이 끝났습니다.", 480, 220, 27, "#173d59", "center");
+  text("실제 실험에서는 이제 검사 장비를 착용하고 본 검사를 시행합니다.", 480, 276, 14, "#42677d", "center");
+  text("본 검사 종료 후 연구자가 ‘항해 종료’를 눌러 절차를 마칩니다.", 480, 310, 14, "#42677d", "center");
+  text("이 테스트 모드에서는 어떤 데이터도 저장하지 않습니다.", 480, 358, 12, "#6f8897", "center");
+}
+function drawDebrief() {
+  const background = ctx.createLinearGradient(0, 0, 0, 576);
+  background.addColorStop(0, "#dbe9ed"); background.addColorStop(1, "#a7c6d0");
+  ctx.fillStyle = background; ctx.fillRect(0, 0, 960, 576);
+  fillRounded(120, 112, 720, 332, 26, "rgba(255,255,255,.95)", "#bfd6de");
+  text("디브리핑", 480, 178, 28, "#173d59", "center");
+  text("게임에서 안내된 보물함 압류와 왕실 국고 귀속은", 480, 235, 15, "#42677d", "center");
+  text("게임에 몰입할 수 있도록 구성한 이야기 설정입니다.", 480, 265, 15, "#42677d", "center");
+  fillRounded(209, 293, 542, 68, 16, "#fff5dc", "#e2c581");
+  text("게임 조건이나 검사 결과와 무관하게", 480, 321, 14, "#785033", "center");
+  text("모든 참가자에게 20,000원이 지급됩니다.", 480, 347, 16, "#785033", "center");
+  text("참여해 주셔서 감사합니다.", 480, 402, 13, "#617f92", "center");
 }
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  if (state.phase === "intake") drawIntro(); else if (state.phase === "story") drawStory(); else if (state.phase === "cave") drawCaveScene(); else if (state.phase === "caveIntro" || state.phase === "caveExitStory") drawCaveNarrative(state.phase); else if (state.phase === "deck") drawDeck(); else if (state.phase === "deckIntro") drawDeckNarrative(); else if (state.phase === "handoff") drawHandoff(); else if (state.phase === "practice") drawPractice(); else if (state.phase === "practiceComplete") drawPracticeComplete(); else drawShore();
+  if (state.phase === "intake") drawIntro(); else if (state.phase === "story") drawStory(); else if (state.phase === "cave") drawCaveScene(); else if (state.phase === "caveIntro" || state.phase === "caveExitStory") drawCaveNarrative(state.phase); else if (state.phase === "deck") drawDeck(); else if (state.phase === "deckIntro") drawDeckNarrative(); else if (state.phase === "handoff") drawHandoff(); else if (state.phase === "practice") drawPractice(); else if (state.phase === "practiceComplete") drawPracticeComplete(); else if (state.phase === "debrief") drawDebrief(); else drawShore();
 }
 
 function intakeMarkup() {
@@ -642,6 +713,7 @@ function bindActions() {
   document.querySelector("#practice-yes")?.addEventListener("click", () => answerPractice("yes"));
   document.querySelector("#practice-no")?.addEventListener("click", () => answerPractice("no"));
   document.querySelector("#finish-game")?.addEventListener("click", finishGame);
+  document.querySelector("#go-cit")?.addEventListener("click", startCitExam);
   document.querySelector("#new-session")?.addEventListener("click", resetGame);
 }
 function updateScreen() {
@@ -653,7 +725,8 @@ function updateScreen() {
   else if (state.phase === "deckIntro") setActions('<button id="start-deck-loading" class="pixel-button" type="button">화물 적재하기</button>');
   else if (state.phase === "handoff") setActions('<button id="start-practice" class="pixel-button" type="button">검사 연습 시작</button>');
   else if (state.phase === "practice" && state.practiceAudioFinished) setActions('<button id="practice-yes" class="pixel-button quiet" type="button">예</button><button id="practice-no" class="pixel-button" type="button">아니오</button>');
-  else if (state.phase === "practiceComplete") setActions('<button id="finish-game" class="pixel-button" type="button">검사 연습 완료</button>');
+  else if (state.phase === "practiceComplete") setActions(state.testMode ? '<button id="finish-game" class="pixel-button" type="button">항해 종료</button>' : (state.citFinished ? '<button id="finish-game" class="pixel-button" type="button">항해 종료</button>' : '<button id="go-cit" class="pixel-button" type="button">장비 착용 후 본검사로 이동</button>'));
+  else if (state.phase === "debrief") setActions('<button id="new-session" class="pixel-button" type="button">처음으로</button>');
   else setActions("");
   ui.message.textContent = state.notification;
   bindActions(); draw();
@@ -696,7 +769,7 @@ function pickupTreasure() {
 function depositTreasure() {
   const detail = state.condition === "gem" ? `${selectedGem().label} → 보물함` : "황금 동전 한 닢 → 보물함";
   record(state.condition === "gem" ? "gem_deposited" : "coins_deposited", detail, { assigned_chest: "treasure_chest" });
-  state.carrying = null; state.phase = "handoff";
+  state.carrying = null; state.chestValue = 20000; state.phase = "handoff";
   if (!state.testMode) { createCitSchedule(); record("exam_handoff_onset", "게임 완료 · 동공 및 폴리그래프 검사 준비", { cit_trial_count: state.citSchedule.length }); }
   setMessage(state.testMode ? "시연을 완료했습니다. 데이터는 저장되지 않았습니다." : "게임 기록을 보관했습니다. 이제 생리검사를 준비하세요."); updateScreen();
 }
@@ -731,40 +804,55 @@ function playPracticeQuestion() {
   audio.onerror = startFallback;
   audio.play().catch(startFallback);
 }
+function presentPracticeStimulus() {
+  if (state.phase !== "practice") return;
+  state.practiceStimulusVisible = true;
+  setMessage("흑백 사물을 보면서 질문을 들어 주세요.");
+  updateScreen();
+  playPracticeQuestion();
+}
 function startPractice() {
   state.phase = "practice";
   state.practiceIndex = 0;
+  state.practiceStimulusVisible = false;
   state.practiceAudioFinished = false;
   setMessage("중앙 십자를 바라보고 질문을 들어 주세요.");
   updateScreen();
-  window.setTimeout(playPracticeQuestion, 250);
+  window.setTimeout(presentPracticeStimulus, 900);
 }
 function answerPractice(answer) {
   record("practice_response", "연습 문항 " + (state.practiceIndex + 1) + " · " + answer);
   if (state.practiceIndex < practiceQuestions.length - 1) {
     state.practiceIndex += 1;
+    state.practiceStimulusVisible = false;
     state.practiceAudioFinished = false;
     setMessage("다음 질문을 듣고 중앙 십자를 바라봐 주세요.");
     updateScreen();
-    window.setTimeout(playPracticeQuestion, 450);
+    window.setTimeout(presentPracticeStimulus, 900);
     return;
   }
   state.phase = "practiceComplete";
-  setMessage("검사 연습을 완료했습니다. 데이터는 저장되지 않았습니다.");
+  setMessage(state.testMode ? "검사 연습을 완료했습니다. 데이터는 저장되지 않았습니다." : "검사 연습을 완료했습니다. 이제 연구자 안내에 따라 본검사를 진행합니다.");
   updateScreen();
 }
 function createCitSchedule() {
   if (state.citSchedule.length) return;
   for (let round = 1; round <= 5; round += 1) {
-    shuffle(gems).forEach((gem, index) => {
-      const isProbe = state.condition === "gem" && gem.id === state.targetGem;
-      const gemName = gem.label.replace(/^.+빛\s/, "");
-      state.citSchedule.push({ session_id: state.id, participant_code: state.participant.code, round, trial_in_round: index + 1, trial_number: state.citSchedule.length + 1, candidate_gem: gemName, candidate_id: gem.id, item_type: isProbe ? "probe" : "irrelevant", question_text: `당신은 동굴에서 ${objectForm(gemName)} 가져오셨습니까?`, expected_response: "아니요" });
+    shuffle(citCandidates).forEach((candidate, index) => {
+      const isProbe = state.condition === "gem" && candidate.id === "jewel";
+      state.citSchedule.push({ session_id: state.id, participant_code: state.participant.code, round, trial_in_round: index + 1, trial_number: state.citSchedule.length + 1, candidate_object: candidate.label, candidate_id: candidate.id, item_type: isProbe ? "probe" : "irrelevant", question_text: `당신은 동굴에서 ${objectForm(candidate.label)} 가져오셨습니까?`, expected_response: "아니요" });
     });
   }
   saveTemporary();
 }
-function finishGame() { if (!state.testMode) record("game_record_complete", "게임 단계 기록 완료"); setMessage(state.testMode ? "검사 연습을 마쳤습니다. 데이터는 저장되지 않았습니다." : "게임 단계가 완료되었습니다. CSV 파일을 검사 세션 폴더에 함께 보관하세요."); setActions('<button id="new-session" class="pixel-button" type="button">처음으로</button>'); bindActions(); }
+function finishGame() { if (!state.testMode) record("game_record_complete", "게임 단계 기록 완료"); state.phase = "debrief"; setMessage("게임과 검사에 관한 안내를 확인해 주세요."); updateScreen(); }
+function startCitExam() {
+  createCitSchedule();
+  record("cit_handoff_onset", "연습 완료 · 본검사 화면으로 이동", { cit_trial_count: state.citSchedule.length });
+  saveTemporary();
+  const query = new URLSearchParams({ session: state.id, condition: state.condition, return: "/odyssey" });
+  window.top.location.href = `/cit?${query.toString()}`;
+}
 
 function interact() {
   if (state.phase === "shoreToCave") { if (near({ x: 765, y: 405 }, 78)) enterCave(); else setMessage("빛나는 동굴 포탈 가까이에서 SPACE를 누르세요."); return; }
@@ -801,7 +889,7 @@ function download(filename, headings, rows) {
   const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = filename; link.click(); URL.revokeObjectURL(link.href);
 }
 function downloadEvents() { download(`${state.id}_game_events.csv`, ["local_time", "iso_time", "session_id", "participant_code", "condition", "target_gem", "event", "detail", "assigned_chest", "cit_trial_count"], state.events); }
-function downloadCit() { createCitSchedule(); download(`${state.id}_cit_schedule.csv`, ["session_id", "participant_code", "round", "trial_in_round", "trial_number", "candidate_gem", "candidate_id", "item_type", "question_text", "expected_response"], state.citSchedule); }
+function downloadCit() { createCitSchedule(); download(`${state.id}_cit_schedule.csv`, ["session_id", "participant_code", "round", "trial_in_round", "trial_number", "candidate_object", "candidate_id", "item_type", "question_text", "expected_response"], state.citSchedule); }
 
 function hasSupabaseConfig() { const config = window.CIT_SUPABASE_CONFIG; return Boolean(config && config.url && config.anonKey && config.sessionTable && config.eventTable); }
 function updateStorageStatus() { ui.storageStatus.textContent = state.testMode ? "테스트 모드: 저장하지 않음" : (hasSupabaseConfig() ? "저장 위치: Supabase 전송 시도 + 현재 탭의 임시 기록" : "저장 위치: 현재 탭의 임시 기록 · 실제 연구 전 Supabase 설정 필요"); }
@@ -828,7 +916,13 @@ async function sendSessionToSupabase() {
 }
 function resetGame() {
   if ("speechSynthesis" in window) window.speechSynthesis.cancel();
-  state = newState(); player.x = 130; player.y = 425; activeCrewBubble = null; nextCrewBubbleAt = 0; crewTurn = 0; crewLineTurn = 0; updateStorageStatus(); record("session_created", "새 게임 세션 생성"); setMessage(state.notification); updateScreen(); renderEventLog();
+  if (citReturned) {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem("ophtheon-cit-game-temporary") || "null");
+      state = saved && saved.id === routeParams.get("session") ? { ...saved, phase: "practiceComplete", citFinished: true, notification: "본검사가 완료되었습니다. 연구자가 항해 종료를 눌러 절차를 마칩니다." } : newState();
+    } catch { state = newState(); }
+  } else state = newState();
+  player.x = 130; player.y = 425; activeCrewBubble = null; nextCrewBubbleAt = 0; crewTurn = 0; crewLineTurn = 0; updateStorageStatus(); if (!citReturned) record("session_created", "새 게임 세션 생성"); setMessage(state.notification); updateScreen(); renderEventLog();
 }
 
 window.addEventListener("keydown", (event) => {
