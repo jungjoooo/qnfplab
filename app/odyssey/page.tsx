@@ -6,8 +6,9 @@ type OdysseyPageProps = {
 
 export default async function OdysseyPage({ searchParams }: OdysseyPageProps) {
   const params = await searchParams;
-  const condition = params.condition === "coins" ? "coins" : "gem";
-  const iframeQuery = new URLSearchParams({ study: "1", condition });
+  const condition = params.condition === "coins" ? "coins" : params.condition === "gem" ? "gem" : "";
+  const iframeQuery = new URLSearchParams({ study: "1" });
+  if (condition) iframeQuery.set("condition", condition);
   if (params.participant) iframeQuery.set("participant", params.participant);
   if (params.cit === "complete") iframeQuery.set("cit", "complete");
   if (params.session) iframeQuery.set("session", params.session);

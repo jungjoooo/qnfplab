@@ -4,6 +4,7 @@ ctx.imageSmoothingEnabled = true;
 const routeParams = new URLSearchParams(window.location.search);
 const studyMode = routeParams.get("study") === "1";
 const citReturned = routeParams.get("cit") === "complete";
+const BRIDGE = "http://127.0.0.1:8765";
 
 const ui = {
   questTitle: document.querySelector("#quest-title"), questProgress: document.querySelector("#quest-progress"),
@@ -19,7 +20,7 @@ const gems = [
 // 금화는 진실 집단이 게임 안에서 획득하는 물건이며, CIT 검사 후보에는 넣지 않는다.
 // 검사 후보는 동일한 흑백 삽화 규격으로 제시할 것을 전제로 한 별도 목록이다.
 const citCandidates = [
-  { id: "jewel", label: "다이아몬드" },
+  { id: "diamond", label: "다이아몬드" },
   { id: "ring", label: "귀중한 반지" },
   { id: "watch", label: "은제 회중시계" },
   { id: "gold_bar", label: "금괴" },
@@ -49,6 +50,7 @@ let crewTurn = 0;
 let crewLineTurn = 0;
 let lastFrame = performance.now();
 let state;
+let allocationLoadStarted = false;
 
 function makeId() { return `CIT-${new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14)}-${Math.floor(Math.random() * 900 + 100)}`; }
 function selectedGem() { return gems.find((gem) => gem.id === state.targetGem); }
@@ -65,8 +67,8 @@ function objectForm(noun) {
 
 function newState() {
   return {
-    id: makeId(), phase: studyMode ? "story" : "intake", condition: routeParams.get("condition") || ui.condition.value, targetGem: ui.gem.value,
-    testMode: !studyMode, participant: studyMode ? { code: routeParams.get("participant") || "" } : {}, carrying: null, chest: null, chestValue: 0, storyPage: 0, practiceStimulusVisible: false, practiceIndex: 0, practiceAudioFinished: false, events: [], citSchedule: [], notification: studyMode ? "비밀 지도를 따라 동굴을 향해 출발하세요." : "시연할 집단을 선택하세요. 이 모드에서는 데이터를 저장하지 않습니다.",
+    id: makeId(), phase: "intake", condition: studyMode ? "" : (routeParams.get("condition") || ""), targetGem: ui.gem.value,
+    testMode: !studyMode, participant: studyMode ? { code: routeParams.get("participant") || "" } : {}, allocation: null, carrying: null, chest: null, chestValue: 0, storyPage: 0, practiceStimulusVisible: false, practiceIndex: 0, practiceAudioFinished: false, events: [], citSchedule: [], notification: studyMode ? "연구자가 참가자 정보를 입력한 뒤 항해를 시작합니다." : "시연할 집단을 선택하세요. 이 모드에서는 데이터를 저장하지 않습니다.",
   };
 }
 
@@ -94,7 +96,7 @@ function setActions(markup) { ui.actions.innerHTML = markup; }
 function updateHud() {
   const target = selectedGem();
   const labels = {
-    intake: ["시연 집단 선택", "준비"], story: ["항해 이야기", `${state.storyPage + 1} / 3`], caveIntro: ["동굴 탐색", "2 / 4"], caveExitStory: ["보물 회수", "2 / 4"], deckIntro: ["선박 적재", "4 / 4"],
+    intake: [state.testMode ? "시연 집단 선택" : "실험 시작 준비", "준비"], story: ["항해 이야기", `${state.storyPage + 1} / 3`], caveIntro: ["동굴 탐색", "2 / 4"], caveExitStory: ["보물 회수", "2 / 4"], deckIntro: ["선박 적재", "4 / 4"],
     shoreToCave: ["동굴 입구로 이동", "1 / 4"], cave: [state.carrying ? "해안으로 돌아가기" : (state.condition === "gem" ? `${target.label} 획득` : "황금 동전 획득"), "2 / 4"],
     shoreToShip: ["보물선으로 이동", "3 / 4"], deck: [state.carrying ? "화물함에 적재" : "적재 완료" , "4 / 4"],
     handoff: ["왕실 검사관 안내", "검사 준비"],
@@ -587,7 +589,7 @@ function drawIntro() {
   const veil = ctx.createLinearGradient(0, 0, 0, 576); veil.addColorStop(0, "rgba(9,45,74,.43)"); veil.addColorStop(1, "rgba(5,25,43,.68)"); ctx.fillStyle = veil; ctx.fillRect(0, 0, 960, 576);
   titleText("보물찾기", 480, 146, 52, "#fff4b3", "center"); text("비밀 지도에 적힌 마지막 항해", 480, 181, 17, "#f2fbff", "center");
   text("당신은 보물선의 선장입니다.", 480, 258, 19, "#ffffff", "center");
-  text(state.phase === "intake" ? "오늘의 항해를 선택하세요." : "비밀 지도를 따라 동굴을 향해 출발하세요.", 480, 291, 15, "#d7edf5", "center");
+  text(state.testMode ? "오늘의 시연 항해를 선택하세요." : "연구자가 참가자 정보와 항해 조건을 확인합니다.", 480, 291, 15, "#d7edf5", "center");
 }
 function drawTreasureMap(x, y) {
   ctx.save(); ctx.shadowColor = "rgba(11,37,56,.34)"; ctx.shadowBlur = 15; ctx.shadowOffsetY = 7;
@@ -696,14 +698,35 @@ function draw() {
 }
 
 function intakeMarkup() {
-  return `<section class="intake-card demo-card">
+  if (!studyMode) return `<section class="intake-card demo-card">
     <p class="eyebrow">DEMO MODE · NO DATA SAVED</p><h2>보물찾기 시연</h2><p>시연할 집단을 선택하세요. 참가자 정보·이벤트·CSV는 저장하지 않습니다.</p>
     <div class="demo-options"><button id="demo-gem" class="pixel-button" type="button">보석 집단<br /><small>거짓</small></button><button id="demo-coins" class="pixel-button quiet" type="button">금화 집단<br /><small>진실</small></button></div>
+  </section>`;
+  const allocation = state.allocation;
+  const allocationPanel = allocation?.ready
+    ? `<p class="allocation-ready">배정표 준비 완료 · 총 ${allocation.total_participants}명 · 번호에 따라 조건이 자동 배정됩니다.</p>`
+    : allocation?.error
+      ? `<p class="intake-error">${allocation.error}</p>`
+      : `<div class="allocation-setup"><strong>최초 1회: 무작위 배정표 생성</strong><span>예상 참여 인원</span><input id="allocation-total" type="number" min="2" step="1" value="60" /><button id="initialize-allocation" class="pixel-button quiet compact" type="button">배정표 만들기</button></div>`;
+  return `<section class="intake-card study-card">
+    <p class="eyebrow">RESEARCHER SETUP</p><h2>실험 시작 준비</h2><p>참가자에게는 화면을 보이지 않게 하고, 연구자가 아래 항목을 입력해 주세요.</p>
+    ${allocationPanel}
+    <form id="study-intake-form" class="intake-form">
+      <label>참가자 번호 <small>연구자가 순번대로 작성</small><input id="participant-code" required inputmode="numeric" autocomplete="off" placeholder="예: 1" value="${routeParams.get("participant") || ""}" /></label>
+      <label>성명<input id="participant-name" required autocomplete="name" /></label>
+      <label>생년월일<input id="participant-birth-date" required type="date" /></label>
+      <label>성별<select id="participant-gender" required><option value="" selected disabled>선택</option><option value="여성">여성</option><option value="남성">남성</option><option value="기타/응답 안 함">기타/응답 안 함</option></select></label>
+      <label>연락처<input id="participant-phone" required inputmode="tel" autocomplete="tel" placeholder="보상 지급용" /></label>
+      <p id="intake-error" class="intake-error" role="alert"></p>
+      <button class="pixel-button intake-submit" type="submit">항해 시작</button>
+    </form>
   </section>`;
 }
 function bindActions() {
   document.querySelector("#demo-gem")?.addEventListener("click", () => startDemo("gem"));
   document.querySelector("#demo-coins")?.addEventListener("click", () => startDemo("coins"));
+  document.querySelector("#study-intake-form")?.addEventListener("submit", (event) => { event.preventDefault(); void startStudy(); });
+  document.querySelector("#initialize-allocation")?.addEventListener("click", () => { void initializeAllocation(); });
   document.querySelector("#story-next")?.addEventListener("click", advanceStory);
   document.querySelector("#begin-voyage")?.addEventListener("click", beginVoyage);
   document.querySelector("#start-cave-explore")?.addEventListener("click", startCaveExplore);
@@ -730,12 +753,73 @@ function updateScreen() {
   else setActions("");
   ui.message.textContent = state.notification;
   bindActions(); draw();
+  if (state.phase === "intake" && studyMode && !state.allocation && !allocationLoadStarted) void loadAllocationStatus();
 }
 function startDemo(condition) {
   state.condition = condition;
   state.storyPage = 0;
   state.phase = "story";
   setMessage("게임 안내를 확인한 뒤 게임 시작을 누르세요."); updateScreen();
+}
+async function startStudy() {
+  const participant = {
+    code: document.querySelector("#participant-code")?.value.trim() || "",
+    full_name: document.querySelector("#participant-name")?.value.trim() || "",
+    birth_date: document.querySelector("#participant-birth-date")?.value || "",
+    gender: document.querySelector("#participant-gender")?.value || "",
+    phone: document.querySelector("#participant-phone")?.value.trim() || "",
+  };
+  const errorNode = document.querySelector("#intake-error");
+  if (!participant.code || !participant.full_name || !participant.birth_date || !participant.gender || !participant.phone) {
+    errorNode.textContent = "참가자 정보를 모두 확인해 주세요.";
+    return;
+  }
+  try {
+    const response = await fetch(`${BRIDGE}/api/participant/register`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ participant_id: participant.code, participant }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || "로컬 저장 프로그램에 연결하지 못했습니다.");
+    state.participant = { ...participant, code: result.participant_id, age_at_experiment: result.age_at_experiment };
+    state.condition = result.condition;
+    state.storyPage = 0;
+    record("participant_registered", "참가자 정보 저장 및 무작위 배정표 조건 자동 연결");
+    state.phase = "story";
+    setMessage("연구자 확인이 끝났습니다. 항해 이야기를 시작합니다.");
+    updateScreen();
+  } catch (error) {
+    errorNode.textContent = error instanceof Error ? error.message : "로컬 저장 프로그램에 연결하지 못했습니다.";
+  }
+}
+async function loadAllocationStatus() {
+  allocationLoadStarted = true;
+  try {
+    const response = await fetch(`${BRIDGE}/api/allocation/status`);
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || "배정표를 확인하지 못했습니다.");
+    state.allocation = result;
+  } catch (error) {
+    state.allocation = { ready: false, error: error instanceof Error ? error.message : "배정표를 확인하지 못했습니다." };
+  }
+  updateScreen();
+}
+async function initializeAllocation() {
+  const errorNode = document.querySelector("#intake-error");
+  const total = Number(document.querySelector("#allocation-total")?.value || 0);
+  if (!Number.isInteger(total) || total < 2) { errorNode.textContent = "예상 참여 인원은 2명 이상 숫자로 입력해 주세요."; return; }
+  if (!window.confirm(`${total}명의 보석·금화 조건을 무작위로 배정합니다. 생성 후에는 이 배정표를 그대로 사용합니다.`)) return;
+  try {
+    const response = await fetch(`${BRIDGE}/api/allocation/initialize`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ total_participants: total }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || "배정표를 만들지 못했습니다.");
+    state.allocation = result;
+    updateScreen();
+  } catch (error) {
+    errorNode.textContent = error instanceof Error ? error.message : "배정표를 만들지 못했습니다.";
+  }
 }
 function advanceStory() {
   if (state.storyPage < 2) { state.storyPage += 1; setMessage("항해일지를 넘겨 다음 장면을 확인하세요."); updateScreen(); return; }
@@ -839,7 +923,7 @@ function createCitSchedule() {
   if (state.citSchedule.length) return;
   for (let round = 1; round <= 5; round += 1) {
     shuffle(citCandidates).forEach((candidate, index) => {
-      const isProbe = state.condition === "gem" && candidate.id === "jewel";
+      const isProbe = state.condition === "gem" && candidate.id === "diamond";
       state.citSchedule.push({ session_id: state.id, participant_code: state.participant.code, round, trial_in_round: index + 1, trial_number: state.citSchedule.length + 1, candidate_object: candidate.label, candidate_id: candidate.id, item_type: isProbe ? "probe" : "irrelevant", question_text: `당신은 동굴에서 ${objectForm(candidate.label)} 가져오셨습니까?`, expected_response: "아니요" });
     });
   }
@@ -921,7 +1005,7 @@ function resetGame() {
       const saved = JSON.parse(sessionStorage.getItem("ophtheon-cit-game-temporary") || "null");
       state = saved && saved.id === routeParams.get("session") ? { ...saved, phase: "practiceComplete", citFinished: true, notification: "본검사가 완료되었습니다. 연구자가 항해 종료를 눌러 절차를 마칩니다." } : newState();
     } catch { state = newState(); }
-  } else state = newState();
+  } else { state = newState(); allocationLoadStarted = false; }
   player.x = 130; player.y = 425; activeCrewBubble = null; nextCrewBubbleAt = 0; crewTurn = 0; crewLineTurn = 0; updateStorageStatus(); if (!citReturned) record("session_created", "새 게임 세션 생성"); setMessage(state.notification); updateScreen(); renderEventLog();
 }
 

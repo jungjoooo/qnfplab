@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 
 type Candidate = { id: string; label: string };
 type Trial = Candidate & { block: number; number: number };
-type Stage = "ready" | "baseline" | "fixation" | "stimulus" | "question" | "intertrial" | "complete";
+type Stage = "ready" | "baseline" | "fixation" | "stimulus" | "question" | "intertrial" | "rest" | "complete";
 
 const CANDIDATES: Candidate[] = [
   { id: "diamond", label: "다이아몬드" },
@@ -63,8 +63,12 @@ export default function CitClient() {
     try {
       const saved = sessionStorage.getItem("ophtheon-cit-game-temporary");
       const state = saved ? JSON.parse(saved) : null;
-      return { id: state?.participant?.code || state?.id || `CIT-${Date.now()}`, condition: state?.condition || "" };
-    } catch { return { id: `CIT-${Date.now()}`, condition: "" }; }
+      const sessionId = state?.id || `CIT-${Date.now()}`;
+      return { sessionId, participantId: state?.participant?.code || sessionId, condition: state?.condition || "", profile: state?.participant || {}, gameEvents: state?.events || [] };
+    } catch {
+      const sessionId = `CIT-${Date.now()}`;
+      return { sessionId, participantId: sessionId, condition: "", profile: {}, gameEvents: [] };
+    }
   }, []);
 
   const callBridge = async (path: string, body?: object) => {
@@ -106,7 +110,7 @@ export default function CitClient() {
     try {
       if (!bridge?.pupil_connected) throw new Error("Pupil Capture 연결을 먼저 확인해 주세요.");
       setError("");
-      await callBridge("/api/session/start", { session_id: participant.id, participant_id: participant.id, condition: participant.condition, schedule: trials });
+      await callBridge("/api/session/start", { session_id: participant.sessionId, participant_id: participant.participantId, condition: participant.condition, participant: participant.profile, game_events: participant.gameEvents, schedule: trials });
       setStarted(true); setStage("baseline"); setMessage("회색 화면을 편안히 바라봐 주세요.");
       await mark("baseline_gray_onset", { event_type: "baseline" });
       window.setTimeout(async () => { await mark("baseline_gray_offset", { event_type: "baseline" }); await nextTrial(); }, 10000);
@@ -118,14 +122,28 @@ export default function CitClient() {
       const nextIndex = index + 1;
       setStage("intertrial"); setMessage("답변이 저장되었습니다. 다음 시행을 준비합니다.");
       window.setTimeout(() => {
-        void mark(`cit_b${String(active.block).padStart(2, "0")}_t${String(active.number).padStart(2, "0")}_${active.id}_response_offset`, { participant_answer: answer });
-        setIndex(nextIndex);
-        void nextTrial(nextIndex);
+        void (async () => {
+          await mark(`cit_b${String(active.block).padStart(2, "0")}_t${String(active.number).padStart(2, "0")}_${active.id}_response_offset`, { participant_answer: answer });
+          if (nextIndex < trials.length && nextIndex % CANDIDATES.length === 0) {
+            setStage("rest"); setMessage(`${active.block}세션이 끝났습니다. 중앙 십자를 바라보며 잠시 쉬어 주세요.`);
+            await mark(`cit_b${String(active.block).padStart(2, "0")}_rest_onset`, { block_id: active.block, detail: "10초 휴식" });
+            window.setTimeout(() => {
+              void (async () => {
+                await mark(`cit_b${String(active.block).padStart(2, "0")}_rest_offset`, { block_id: active.block });
+                setIndex(nextIndex);
+                await nextTrial(nextIndex);
+              })();
+            }, 10000);
+            return;
+          }
+          setIndex(nextIndex);
+          await nextTrial(nextIndex);
+        })();
       }, 2500);
     } catch (caught) { setError(caught instanceof Error ? caught.message : "반응을 저장하지 못했습니다."); }
   };
   const finish = async () => {
-    try { await callBridge("/api/session/finish", {}); window.location.href = `/odyssey?cit=complete&session=${encodeURIComponent(participant.id)}`; }
+    try { await callBridge("/api/session/finish", {}); window.location.href = `/odyssey?cit=complete&session=${encodeURIComponent(participant.sessionId)}`; }
     catch (caught) { setError(caught instanceof Error ? caught.message : "검사를 마무리하지 못했습니다."); }
   };
 
@@ -137,6 +155,7 @@ export default function CitClient() {
       {stage === "baseline" && <div className="grid h-56 w-56 place-items-center text-7xl font-light text-white">+</div>}
       {stage === "fixation" && <div className="grid h-56 w-56 place-items-center text-7xl font-light text-white">+</div>}
       {stage === "intertrial" && <div className="grid h-56 w-56 place-items-center text-7xl font-light text-white">+</div>}
+      {stage === "rest" && <div className="grid h-56 w-56 place-items-center text-7xl font-light text-white">+</div>}
       {(stage === "stimulus" || stage === "question") && active && <Stimulus candidate={active} />}
       {stage === "question" && <><p className="mt-8 text-center text-2xl font-bold text-white">당신은 동굴에서 이 사물을 가져갔습니까?</p><div className="mt-7 flex gap-4"><button onClick={() => void answer("yes")} className="rounded-2xl border-2 border-white bg-white px-12 py-4 text-xl font-bold text-slate-800">예</button><button onClick={() => void answer("no")} className="rounded-2xl border-2 border-white bg-slate-800 px-12 py-4 text-xl font-bold text-white">아니오</button></div></>}
       {stage === "complete" && <div className="max-w-xl rounded-3xl bg-white p-8 text-center shadow-lg"><h1 className="text-3xl font-bold text-slate-800">본검사 완료</h1><p className="mt-4 leading-7 text-slate-600">연구자가 기록 저장을 확인한 뒤 항해 화면으로 돌아갑니다.</p><button onClick={finish} className="mt-6 rounded-xl bg-slate-800 px-6 py-3 font-bold text-white">항해 화면으로 돌아가기</button></div>}

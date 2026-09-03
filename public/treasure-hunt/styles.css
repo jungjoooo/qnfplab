@@ -76,7 +76,8 @@ h2 { font-size: 1.7rem; line-height: 1.1; }
   position: relative;
   flex: 1 1 auto;
   min-height: 0;
-  width: min(100%, calc((100dvh - 194px) * 1.6667 + 12px));
+  /* 화면 높이를 우선 사용해 16:9 게임판을 가능한 크게 유지한다. */
+  width: min(100%, calc((100dvh - 132px) * 1.6667 + 12px));
   margin: 0 auto;
   overflow: hidden;
   border: 1px solid rgba(38, 96, 134, .35);
@@ -119,6 +120,14 @@ canvas {
 .screen-actions { position: absolute; left: 50%; bottom: 58px; transform: translateX(-50%); display: flex; justify-content: center; gap: 12px; }
 .screen-actions:empty { display: none; }
 .screen-actions .pixel-button { min-width: 160px; }
+.screen-actions:has(.intake-card) {
+  inset: 0;
+  z-index: 2;
+  padding: 70px 20px 46px;
+  transform: none;
+  display: grid;
+  place-items: center;
+}
 .touch-controls { display: none; }
 
 .intake-card {
@@ -132,6 +141,21 @@ canvas {
 }
 .intake-card h2 { margin-bottom: 10px; font-size: 1.9rem; }
 .intake-card p { line-height: 1.55; }
+.study-card { width: min(560px, calc(100vw - 56px)); padding: 22px 28px; }
+.study-card h2 { margin: 2px 0 6px; font-size: 1.65rem; }
+.study-card > p { margin: 0; font-size: .95rem; line-height: 1.4; }
+.study-card .intake-form { margin-top: 14px; gap: 10px; }
+.study-card .intake-form label { gap: 4px; font-size: .95rem; }
+.study-card .intake-form label small { font-size: .76rem; color: #647c8e; font-weight: 600; }
+.study-card .intake-form input,
+.study-card .intake-form select { min-height: 40px; padding: 8px 10px; }
+.study-card .intake-submit { margin-top: 2px; }
+.allocation-ready { margin: 10px 0 -2px !important; padding: 8px 10px; border-radius: 10px; background: #e8f6ee; color: #267650; font-size: .82rem !important; font-weight: 700; }
+.allocation-setup { display: grid; grid-template-columns: 1fr auto auto; gap: 6px 8px; align-items: center; margin-top: 10px; padding: 9px 10px; border: 1px solid #c7dce5; border-radius: 11px; background: #edf6f9; color: #315d78; font-size: .82rem; }
+.allocation-setup strong { grid-column: 1 / -1; }
+.allocation-setup span { font-weight: 700; }
+.allocation-setup input { width: 64px; min-height: 31px; padding: 4px 7px; border: 1px solid #b7d0dd; border-radius: 8px; background: #fff; color: #163d57; font-weight: 700; }
+.pixel-button.compact { min-width: auto; min-height: 31px; padding: 6px 10px; font-size: .78rem; }
 .demo-options { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 24px; }
 .demo-options .pixel-button { min-height: 84px; font-size: 1.26rem; }
 .demo-options small { font-size: .94rem; opacity: .8; }
@@ -187,4 +211,34 @@ select { border: 1px solid #b7d0dd; border-radius: 9px; padding: 7px 9px; backgr
   .intake-card { width: min(440px, calc(100vw - 38px)); padding: 21px; border-radius: 20px; }
   .demo-options { gap: 9px; margin-top: 17px; }
   .event-row { grid-template-columns: 1fr; gap: 2px; }
+}
+
+@media (max-height: 760px) and (min-width: 661px) {
+  .game-shell { padding: 8px 0; gap: 7px; }
+  .game-header { min-height: 43px; }
+  h1 { font-size: clamp(2rem, 3.4vw, 2.7rem); }
+  .eyebrow { font-size: .7rem; }
+  .hud { min-height: 49px; padding: 6px 15px; }
+  .hud strong { font-size: 1.1rem; }
+  .game-message { min-height: 31px; padding: 6px 13px; font-size: .96rem; }
+  .screen-actions { bottom: 45px; }
+  .screen-actions:has(.intake-card) { padding: 12px; }
+  .study-card { transform: scale(.86); transform-origin: center; }
+  .allocation-setup { font-size: .75rem; }
+}
+
+@media (max-height: 520px) and (min-width: 661px) {
+  .game-shell { padding: 4px 0; gap: 3px; }
+  .game-header { min-height: 34px; }
+  .header-side .session-chip { padding: 4px 8px; font-size: .75rem; }
+  .header-side .pixel-button { padding: 6px 10px; }
+  h1 { font-size: 1.7rem; }
+  .game-frame { width: min(100%, calc((100dvh - 75px) * 1.6667)); }
+  .hud { min-height: 39px; padding: 4px 12px; }
+  .hud-label { font-size: .68rem; }
+  .hud strong { font-size: .96rem; }
+  .game-message { min-height: 25px; padding: 4px 10px; font-size: .82rem; }
+  .screen-actions { bottom: 25px; }
+  .screen-actions:has(.intake-card) { padding: 45px 6px 29px; }
+  .study-card { transform: scale(.68); transform-origin: center; }
 }
