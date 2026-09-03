@@ -716,7 +716,7 @@ function intakeMarkup() {
       <label>성명<input id="participant-name" required autocomplete="name" /></label>
       <label>생년월일<input id="participant-birth-date" required type="date" /></label>
       <label>성별<select id="participant-gender" required><option value="" selected disabled>선택</option><option value="여성">여성</option><option value="남성">남성</option><option value="기타/응답 안 함">기타/응답 안 함</option></select></label>
-      <label>연락처<input id="participant-phone" required inputmode="tel" autocomplete="tel" placeholder="보상 지급용" /></label>
+      <label>연락처<input id="participant-phone" required inputmode="numeric" autocomplete="tel" pattern="010[0-9]{8}" title="하이픈 없이 01012345678 형식으로 입력해 주세요." placeholder="예: 01012345678" /></label>
       <p id="intake-error" class="intake-error" role="alert"></p>
       <button class="pixel-button intake-submit" type="submit">항해 시작</button>
     </form>
